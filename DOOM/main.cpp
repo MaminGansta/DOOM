@@ -213,7 +213,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			}
 		}
 
-		// Controls
+		// Movement
 		if (input.buttons[BUTTON_RROTATE].is_down)
 			player_a += 0.029f;
 
@@ -226,15 +226,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		{
 			moving_x = true;
 			speed_x_dir = 1;
-			//if (speed_x > 0)
-			//	speed_x = 0;
 		}
 		else if (input.buttons[BUTTON_DOWN].is_down)
 		{
 			moving_x = true;
 			speed_x_dir = (-1);
-			//if (speed_x < 0)
-			//	speed_x = 0;
 		}
 		else
 			moving_x = false;
@@ -244,15 +240,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		{
 			moving_y = true;
 			speed_y_dir = -1;
-			//if (speed_y < 0)
-			//	speed_y = 0;
 		}
 		else if (input.buttons[BUTTON_RIGHT].is_down)
 		{
 			moving_y = true;			
 			speed_y_dir = 1;
-			//if (speed_y > 0)
-			//	speed_y = 0;
 		}
 		else
 			moving_y = false;
@@ -291,8 +283,23 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		player_x += nFrameTime * cosf(player_a)  *speed_x;
 		player_y += nFrameTime * sinf(player_a)  *speed_x;
 
+		// Collision detection
+		if (map[(int)(player_y + 0.5f) * map_w + (int)(player_x + 0.5f)] != ' ')
+		{
+			player_x -= nFrameTime * cosf(player_a) * speed_x;
+			player_y -= nFrameTime * sinf(player_a) * speed_x;
+		}
+
 		player_x += nFrameTime * cosf(player_a + PI / 2) * speed_y;
 		player_y += nFrameTime * sinf(player_a + PI / 2) * speed_y;
+
+		// Collision detection
+		if (map[(int)(player_y + 0.5f) * map_w + (int)(player_x + 0.5f)] != ' ')
+		{
+			player_x -= nFrameTime * cosf(player_a + PI / 2) * speed_y;
+			player_y -= nFrameTime * sinf(player_a + PI / 2) * speed_y;
+		}
+
 
 		// Simulate
 
