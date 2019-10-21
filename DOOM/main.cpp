@@ -81,14 +81,15 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 	// speed
 	float speed_limit = 0.000004f;
-	float speed_change = 0.00000015f;
+	float speed_change = 0.0000002f;
 	int speed_decrease_times = 1.2;
-	float speed_diff = 1.0f;
+	int speed_y_dir = 1;
 
 	// speed x
 	float speed_angle_x = 0.0f;
 	float speed_x = 0.0f;
 	bool moving_x = false;
+	int speed_x_dir = 1;
 
 	// speed y
 	float speed_angle_y = 0.0f;
@@ -224,16 +225,16 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		if (input.buttons[BUTTON_UP].is_down)
 		{
 			moving_x = true;
-			if (abs(speed_angle_x - player_a) > PI / 2) // if opposite direction
-				speed_x = 0;
-			speed_angle_x = player_a;
+			speed_x_dir = 1;
+			//if (speed_x > 0)
+			//	speed_x = 0;
 		}
 		else if (input.buttons[BUTTON_DOWN].is_down)
 		{
 			moving_x = true;
-			if (abs(speed_angle_x - (player_a + PI)) > PI / 2)
-				speed_x = 0;
-			speed_angle_x = player_a + PI;
+			speed_x_dir = (-1);
+			//if (speed_x < 0)
+			//	speed_x = 0;
 		}
 		else
 			moving_x = false;
@@ -242,37 +243,56 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		if (input.buttons[BUTTON_LEFT].is_down)
 		{
 			moving_y = true;
-			if (abs(speed_angle_y - (player_a - PI / 2)) > PI / 2)
-				speed_y = 0;
-			speed_angle_y = player_a - PI / 2;
+			speed_y_dir = -1;
+			//if (speed_y < 0)
+			//	speed_y = 0;
 		}
 		else if (input.buttons[BUTTON_RIGHT].is_down)
 		{
-			moving_y = true;
-			if (abs(speed_angle_y - (player_a + PI / 2)) > PI / 2)
-				speed_y = 0;
-			speed_angle_y = player_a + PI / 2;
+			moving_y = true;			
+			speed_y_dir = 1;
+			//if (speed_y > 0)
+			//	speed_y = 0;
 		}
 		else
 			moving_y = false;
 
 
 		if (moving_x)
-			speed_x = speed_x > speed_limit ? speed_limit : speed_x + speed_change;
+		{
+			if (speed_x_dir > 0)
+				speed_x = speed_x > speed_limit ? speed_limit : speed_x + speed_change;
+			else
+				speed_x = speed_x < (-1) * speed_limit ? (-1) * speed_limit : speed_x - speed_change;
+		}
 		else
-			speed_x = speed_x < 0.0000001f ? 0.0f : speed_x - speed_change * speed_decrease_times;
+		{
+			if (speed_x > 0)
+				speed_x = speed_x < 0.0000001f ? 0.0f : speed_x - speed_change * speed_decrease_times;
+			else
+				speed_x = speed_x > -0.0000001f ? 0.0f : speed_x + speed_change * speed_decrease_times;
+		}
 
 		if (moving_y)
-			speed_y = speed_y > speed_limit ? speed_limit : speed_y + speed_change;
+		{
+			if (speed_y_dir > 0)
+				speed_y = speed_y > speed_limit ? speed_limit : speed_y + speed_change;
+			else
+				speed_y = speed_y < (-1) * speed_limit ? (-1) * speed_limit : speed_y - speed_change;
+		}
 		else
-			speed_y = speed_y < 0.0000001f ? 0.0f : speed_y - speed_change * speed_decrease_times;
+		{
+			if (speed_y > 0)
+				speed_y = speed_y < 0.0000001f ? 0.0f : speed_y - speed_change * speed_decrease_times;
+			else
+				speed_y = speed_y > -0.0000001f ? 0.0f : speed_y + speed_change * speed_decrease_times;
+		}
 
+		player_x += nFrameTime * cosf(player_a)  *speed_x;
+		player_y += nFrameTime * sinf(player_a)  *speed_x;
 
-		player_x += nFrameTime * cosf(speed_angle_x) * speed_x;
-		player_y += nFrameTime * sinf(speed_angle_x) * speed_x;
-
-		player_x += nFrameTime * cosf(speed_angle_y) * speed_y;
-		player_y += nFrameTime * sinf(speed_angle_y) * speed_y;
+		player_x += nFrameTime * cosf(player_a + PI / 2) * speed_y;
+		player_y += nFrameTime * sinf(player_a + PI / 2) * speed_y;
 
 		// Simulate
 
