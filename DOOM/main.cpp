@@ -71,7 +71,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	HWND window = CreateWindow(window_class.lpszClassName, "Game!!!", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, 1024, 512, 0, 0, hInst, 0);
 	HDC hdc = GetDC(window);
 
-	// game vars
+	// GAME VARS------------------------------
 	uint32_t column[2048];
 
 	float player_x = 5.499; // player x position
@@ -79,7 +79,17 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	float player_a = 1.523; // player view direction
 
 
+	// speed 
+	float speed = 0.0f;
+	float speed_limit = 0.000004f;
+	float speed_change = 0.00000015f;
+	int speed_decrease_times = 1.2;
+	float speed_angle = 0.0f;
+	float speed_diff = 1.0f;
+	bool moving = false;
 
+
+	// map
 	const size_t map_w = 16; // map width
 	const size_t map_h = 16; // map height
 	const char map[] =
@@ -112,21 +122,27 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		colors[i] = pack_color((i * 130) % 255, (i * 32)% 255, rand() % 255);
 	}
 
+
+	// load textures
 	uint32_t* walltext = NULL; // textures for the walls
 	size_t walltext_size;  // texture dimensions (it is a square)
 	size_t walltext_cnt;   // number of different textures in the image
 	if (!load_texture("walls2.png", walltext, walltext_size, walltext_cnt))
 	{
-		//std::cerr << "Failed to load wall textures" << std::endl;
 		return -1;
 	}
 
 	// input
 	Input input;
 
+
+
+	// GAME LOOP---------------------------------
+
 	timer_init(FRAMELOCK60);
 	while (running)
 	{
+
 		// Input
 		MSG msg;
 		while (PeekMessage(&msg, window, 0, 0, PM_REMOVE))
@@ -189,34 +205,56 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 		// Controls
 		if (input.buttons[BUTTON_RROTATE].is_down)
-			player_a += 0.02f;
+			player_a += 0.029f;
 
 		if (input.buttons[BUTTON_LROTATE].is_down)
-			player_a -= 0.02f;
+			player_a -= 0.029f;
 
 		if (input.buttons[BUTTON_UP].is_down)
 		{
-			player_x += nFrameTime * cosf(player_a) * 0.000005f;
-			player_y += nFrameTime * sinf(player_a) * 0.000005f;
+			moving = true;
+			if (abs(speed_angle - player_a) > PI / 2) // if opposite direction
+				speed = 0;
+			speed_angle = player_a;
+		}
+		else if (input.buttons[BUTTON_DOWN].is_down)
+		{
+			moving = true;
+			if (abs(speed_angle - (player_a + PI)) > PI / 2)
+				speed = 0;
+			speed_angle = player_a + PI;
+		}
+		else if (input.buttons[BUTTON_LEFT].is_down)
+		{
+			moving = true;
+			if (abs(speed_angle - (player_a - PI / 2)) > PI / 2)
+				speed = 0;
+			speed_angle = player_a - PI / 2;
+		}
+		else if (input.buttons[BUTTON_RIGHT].is_down)
+		{
+			moving = true;
+			if (abs(speed_angle - (player_a + PI / 2)) > PI / 2)
+				speed = 0;
+			speed_angle = player_a + PI / 2;
+		}
+		else
+			moving = false;
+
+		if (moving)
+		{
+			speed = speed > speed_limit ? speed_limit : speed + speed_change;
+		}
+		else
+		{
+			speed = speed < 0.0000001f ? 0.0f : speed - speed_change * speed_decrease_times;
+			if (speed == 0.0f)
+				speed_diff = 1.0f;
 		}
 
-		if (input.buttons[BUTTON_DOWN].is_down)
-		{
-			player_x -= nFrameTime * cosf(player_a) * 0.000005f;
-			player_y -= nFrameTime * sinf(player_a) * 0.000005f;
-		}
 
-		if (input.buttons[BUTTON_LEFT].is_down)
-		{
-			player_y += nFrameTime * cosf(player_a) * 0.000005f;
-			player_x += nFrameTime * sinf(player_a) * 0.000005f;
-		}
-
-		if (input.buttons[BUTTON_RIGHT].is_down)
-		{
-			player_y -= nFrameTime * cosf(player_a) * 0.000005f;
-			player_x -= nFrameTime * sinf(player_a) * 0.000005f;
-		}
+		player_x += nFrameTime * cosf(speed_angle) * speed * speed_diff;
+		player_y += nFrameTime * sinf(speed_angle) * speed * speed_diff;
 
 		// Simulate
 
