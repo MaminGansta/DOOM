@@ -5,6 +5,8 @@
 #define VK_A 0x41
 #define VK_D 0x44
 
+#define VK_DEBUG 0x50
+
 struct Button_state
 {
 	bool is_down { false };

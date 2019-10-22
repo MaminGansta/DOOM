@@ -74,15 +74,15 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	// GAME VARS------------------------------
 	uint32_t column[2048];
 
-	float player_x = 5.499; // player x position
+	float player_x = 2.499; // player x position
 	float player_y = 2.645; // player y position
 	float player_a = 1.523; // player view direction
 
 
 	// speed
-	float speed_limit = 0.000004f;
-	float speed_change = 0.0000002f;
-	int speed_decrease_times = 1.2;
+	float speed_limit = 0.0000035f;
+	float speed_change = 0.00000025f;
+	int speed_decrease_times = 1.0f;
 	int speed_y_dir = 1;
 
 	// speed x
@@ -121,6 +121,17 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		"0001111111100000"; // our game map
 	assert(sizeof(map) == map_w * map_h + 1); // +1 for the null terminated string
 
+	//const size_t map_w = 5; // map width
+	//const size_t map_h = 5; // map height
+	//const char map[] =
+	//	"11111"
+	//	"1   1"
+	//	"1   1"
+	//	"1   1"
+	//	"11111";
+	//assert(sizeof(map) == map_w * map_h + 1); // +1 for the null terminated string
+
+
 	const size_t map_cell_w = win_w / map_w / 3;
 	const size_t map_cell_h = win_h / map_h / 2;
 
@@ -145,6 +156,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	// input
 	Input input;
 
+	bool DEBUG = false;
 
 
 	// GAME LOOP---------------------------------
@@ -203,7 +215,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 					input.buttons[BUTTON_RIGHT].changed = true;
 
 				}break;
-				}
+				case VK_DEBUG:
+				{
+					DEBUG = true;
+				}break;
+			}
 			}break;
 			default:
 			{
@@ -211,6 +227,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				DispatchMessage(&msg);
 			}break;
 			}
+		}
+
+
+		// Break Point
+		if (DEBUG)
+		{
+			DEBUG = false;
 		}
 
 		// Movement
@@ -284,7 +307,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		player_y += nFrameTime * sinf(player_a)  *speed_x;
 
 		// Collision detection
-		if (map[(int)(player_y + 0.5f) * map_w + (int)(player_x + 0.5f)] != ' ')
+		if (map[(int)(player_y + 0.15f) * map_w + (int)(player_x + 0.15f)] != ' ' ||
+			map[(int)(player_y - 0.15f) * map_w + (int)(player_x - 0.15f)] != ' ')
 		{
 			player_x -= nFrameTime * cosf(player_a) * speed_x;
 			player_y -= nFrameTime * sinf(player_a) * speed_x;
@@ -294,7 +318,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		player_y += nFrameTime * sinf(player_a + PI / 2) * speed_y;
 
 		// Collision detection
-		if (map[(int)(player_y + 0.5f) * map_w + (int)(player_x + 0.5f)] != ' ')
+		if (map[(int)(player_y + 0.15f) * map_w + (int)(player_x + 0.15f)] != ' ' ||
+			map[(int)(player_y - 0.15f) * map_w + (int)(player_x - 0.15f)] != ' ')
 		{
 			player_x -= nFrameTime * cosf(player_a + PI / 2) * speed_y;
 			player_y -= nFrameTime * sinf(player_a + PI / 2) * speed_y;
