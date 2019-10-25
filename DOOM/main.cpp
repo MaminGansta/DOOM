@@ -107,8 +107,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		"1              0"
 		"1     111111   0"
 		"1     0        0"
-		"0   1 0  1110000"
-		"0   1 1        0"
+		"0     0  1110000"
+		"0     1        0"
 		"0   100        0"
 		"0   0   11100  0"
 		"0   0   0      0"
@@ -122,8 +122,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	assert(sizeof(map) == map_w * map_h + 1); // +1 for the null terminated string
 
 
-	const size_t map_cell_w = win_w / map_w / 6;
-	const size_t map_cell_h = win_h / map_h / 5;
+	const size_t map_cell_w = win_w / map_w / 5;
+	const size_t map_cell_h = win_h / map_h / 4;
 
 
 	// colors
@@ -140,6 +140,26 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	size_t walltext_cnt;   // number of different textures in the image
 	if (!load_texture("walls2.png", walltext, walltext_size, walltext_cnt))
 	{
+		add_log("texture can't be load");
+		return -1;
+	}
+
+	// load background
+	uint32_t* sky = NULL; // textures for the walls
+	size_t sky_size = 0;  // texture dimensions (it is a square)
+	size_t sky_cnt = 0;   // number of different textures in the image
+	if (!load_texture("sky4.png", sky, sky_size, sky_cnt))
+	{
+		add_log("sky texture can't be load");
+		return -1;
+	}
+
+	uint32_t* floor_texture = NULL; // textures for the walls
+	size_t floor_size = 0;  // texture dimensions (it is a square)
+	size_t floor_cnt = 0;   // number of different textures in the image
+	if (!load_texture("floor.png", floor_texture, floor_size, floor_cnt))
+	{
+		add_log("floor texture can't be load");
 		return -1;
 	}
 
@@ -326,11 +346,25 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		{
 			float angle = player_a - fov / 2 + fov * i / float(surface.width);
 
-			// clear screen
+			// draw the background
 			if (i == 0)
 			{
-				draw_rectangle(&surface, 0,  0,         win_w, win_h / 2, pack_color(170, 170, 170));
-				draw_rectangle(&surface, 0,  win_h / 2, win_w, win_h / 2, pack_color(255, 255, 255));
+				 draw_rectangle(&surface, 0,  0,         win_w, win_h / 2, pack_color(130, 130, 130));
+				//draw_rectangle(&surface, 0,  win_h / 2, win_w, win_h / 2, pack_color(255, 255, 255));
+
+				// sky
+				//double ratio = (double)win_h * win_w / (sky_size * background_size);  // it just work without any scaling (i don't know why)
+				for (int y = win_h / 2; y < win_h; y++)
+				{
+					for (int x = 0; x < win_w; x++)
+					{
+						int scale_y = y;
+						int scale_x = x;
+
+						surface.memory[y * win_w + x] = sky[scale_y * sky_size + scale_x];
+					}
+				}
+
 			}
 
 
