@@ -5,6 +5,7 @@
 #include "input.h"
 #include "timer.h"
 #include "image.h"
+#include "Log/log.h"
 #include "render_stuff.h"
 
 
@@ -68,7 +69,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	RegisterClass(&window_class);
 
 	// create window
-	HWND window = CreateWindow(window_class.lpszClassName, "Game!!!", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, 1024, 512, 0, 0, hInst, 0);
+	HWND window = CreateWindow(window_class.lpszClassName, "Game!!!", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, 800, 620, 0, 0, hInst, 0);
 	HDC hdc = GetDC(window);
 
 	// GAME VARS------------------------------
@@ -80,9 +81,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 
 	// speed
-	float speed_limit = 0.0000035f;
-	float speed_change = 0.00000025f;
-	int speed_decrease_times = 1.0f;
+	float speed_limit = 0.0000045f;
+	float speed_change = 0.000000000015f;
 	int speed_y_dir = 1;
 
 	// speed x
@@ -107,8 +107,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		"1              0"
 		"1     111111   0"
 		"1     0        0"
-		"0     0  1110000"
-		"0     1        0"
+		"0   1 0  1110000"
+		"0   1 1        0"
 		"0   100        0"
 		"0   0   11100  0"
 		"0   0   0      0"
@@ -121,19 +121,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		"0001111111100000"; // our game map
 	assert(sizeof(map) == map_w * map_h + 1); // +1 for the null terminated string
 
-	//const size_t map_w = 5; // map width
-	//const size_t map_h = 5; // map height
-	//const char map[] =
-	//	"11111"
-	//	"1   1"
-	//	"1   1"
-	//	"1   1"
-	//	"11111";
-	//assert(sizeof(map) == map_w * map_h + 1); // +1 for the null terminated string
 
-
-	const size_t map_cell_w = win_w / map_w / 3;
-	const size_t map_cell_h = win_h / map_h / 2;
+	const size_t map_cell_w = win_w / map_w / 6;
+	const size_t map_cell_h = win_h / map_h / 5;
 
 
 	// colors
@@ -161,7 +151,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 	// GAME LOOP---------------------------------
 
-	timer_init(FRAMELOCK60);
+	timer_init();
 	while (running)
 	{
 
@@ -238,10 +228,12 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 		// Movement
 		if (input.buttons[BUTTON_RROTATE].is_down)
-			player_a += 0.029f;
+			player_a += 0.0000029f * nFrameTime;
 
 		if (input.buttons[BUTTON_LROTATE].is_down)
-			player_a -= 0.029f;
+			player_a -= 0.0000029f * nFrameTime;
+
+		player_a = fmod(player_a, 2 * PI);
 
 
 
@@ -276,35 +268,35 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		if (moving_x)
 		{
 			if (speed_x_dir > 0)
-				speed_x = speed_x > speed_limit ? speed_limit : speed_x + speed_change;
+				speed_x = speed_x > speed_limit ? speed_limit : speed_x + speed_change * nFrameTime;
 			else
-				speed_x = speed_x < (-1) * speed_limit ? (-1) * speed_limit : speed_x - speed_change;
+				speed_x = speed_x < (-1) * speed_limit ? (-1) * speed_limit : speed_x - speed_change * nFrameTime;
 		}
 		else
 		{
 			if (speed_x > 0)
-				speed_x = speed_x < 0.0000001f ? 0.0f : speed_x - speed_change * speed_decrease_times;
+				speed_x = speed_x < 0.0000001f ? 0.0f : speed_x - speed_change * nFrameTime;
 			else
-				speed_x = speed_x > -0.0000001f ? 0.0f : speed_x + speed_change * speed_decrease_times;
+				speed_x = speed_x > -0.0000001f ? 0.0f : speed_x + speed_change * nFrameTime;
 		}
 
 		if (moving_y)
 		{
 			if (speed_y_dir > 0)
-				speed_y = speed_y > speed_limit ? speed_limit : speed_y + speed_change;
+				speed_y = speed_y > speed_limit ? speed_limit : speed_y + speed_change * nFrameTime;
 			else
-				speed_y = speed_y < (-1) * speed_limit ? (-1) * speed_limit : speed_y - speed_change;
+				speed_y = speed_y < (-1) * speed_limit ? (-1) * speed_limit : speed_y - speed_change * nFrameTime;
 		}
 		else
 		{
 			if (speed_y > 0)
-				speed_y = speed_y < 0.0000001f ? 0.0f : speed_y - speed_change * speed_decrease_times;
+				speed_y = speed_y < 0.0000001f ? 0.0f : speed_y - speed_change * nFrameTime;
 			else
-				speed_y = speed_y > -0.0000001f ? 0.0f : speed_y + speed_change * speed_decrease_times;
+				speed_y = speed_y > -0.0000001f ? 0.0f : speed_y + speed_change * nFrameTime;
 		}
 
-		player_x += nFrameTime * cosf(player_a)  *speed_x;
-		player_y += nFrameTime * sinf(player_a)  *speed_x;
+		player_x += nFrameTime * cosf(player_a)  * speed_x;
+		player_y += nFrameTime * sinf(player_a)  * speed_x;
 
 		// Collision detection
 		if (map[(int)(player_y + 0.15f) * map_w + (int)(player_x + 0.15f)] != ' ' ||
@@ -327,35 +319,18 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 
 		// Simulate
-
-		for (int i = 0; i < map_h; i++)
-		{
-			for (int j = 0; j < map_w; j++)
-			{
-				int x = j * map_cell_w;
-				int y = i * map_cell_h;
-
-				if (map[i * map_w + j] != ' ')
-					draw_rectangle(&surface, x, y, map_cell_w, map_cell_h, colors[map[i * map_w + j] - 48]); // -48 get id from char
-				else
-					draw_rectangle(&surface, x, y, map_cell_w, map_cell_h, pack_color(255, 255, 255));
-			}
-		}
-
-
-		draw_rectangle(&surface, player_x* map_cell_w - 2, player_y* map_cell_h - 2, 5, 5, pack_color(60, 60, 60));
-
 		const float fov = PI / 3.0f; // field of view
 
-		for (int i = 0; i < win_w / 2; i++)
+		// ray caster
+		for (int i = 0; i < win_w ; i++)
 		{
-			float angle = player_a - fov / 2 + fov * i / float(surface.width / 2);
+			float angle = player_a - fov / 2 + fov * i / float(surface.width);
 
 			// clear screen
 			if (i == 0)
 			{
-				draw_rectangle(&surface, win_w / 2,  0,         win_w / 2, win_h / 2, pack_color(190, 190, 190));
-				draw_rectangle(&surface, win_w / 2,  win_h / 2, win_w / 2, win_h / 2, pack_color(255, 255, 255));
+				draw_rectangle(&surface, 0,  0,         win_w, win_h / 2, pack_color(170, 170, 170));
+				draw_rectangle(&surface, 0,  win_h / 2, win_w, win_h / 2, pack_color(255, 255, 255));
 			}
 
 
@@ -366,8 +341,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 				size_t pix_x = cx * map_cell_w;
 				size_t pix_y = cy * map_cell_h;
-				surface.memory[pix_x + pix_y * surface.width] = pack_color(160, 160, 160);
+				surface.memory[pix_x + pix_y * surface.width] = pack_color(240, 240, 240);
 
+				// ray casting
 				if (map[int(cx) + int(cy) * map_w] != ' ')
 				{
 					size_t column_height = min(2048, (win_h / t / cos(angle - player_a)));
@@ -384,9 +360,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 					if (x_texcoord < 0) x_texcoord += walltext_size; 
 					assert(x_texcoord >= 0 && x_texcoord < (int)walltext_size);
 
-
+					
 					texture_column(column, walltext, walltext_size, walltext_cnt, texid, x_texcoord, column_height);
-					pix_x = win_w / 2 + i;
+					pix_x = i;
 					for (size_t j = 0; j < column_height; j++) {
 						pix_y = j + win_h / 2 - column_height / 2;
 						if (pix_y < 0 || pix_y >= win_h) continue;
@@ -395,17 +371,41 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 					break;
 				}
 			}
-
 		}
+
+		// draw map
+		for (int i = 0; i < map_h; i++)
+		{
+			for (int j = 0; j < map_w; j++)
+			{
+				int x = j * map_cell_w;
+				int y = i * map_cell_h;
+
+				if (map[i * map_w + j] != ' ')
+					draw_rectangle(&surface, x, y, map_cell_w, map_cell_h, colors[map[i * map_w + j] - 48]); // -48 get id from char
+				//else
+					//draw_rectangle(&surface, x, y, map_cell_w, map_cell_h, pack_color(255, 255, 255));
+			}
+		}
+
+		// draw player on map
+		draw_rectangle(&surface, player_x * map_cell_w - 2, player_y * map_cell_h - 2, 5, 5, pack_color(60, 60, 60));
+
+
+		
 
 
 		// Render
 		StretchDIBits(hdc, 0, 0, surface.width, surface.height, 0, 0, surface.width, surface.height, surface.memory, &surface.bitmap_info, DIB_RGB_COLORS, SRCCOPY);
+
+		// Log
+		//add_log(std::to_string(nFPS));
 
 		// Timer
 		timer_update();
 
 	}
 		
+	dump_log();
 	return 0;
 }
