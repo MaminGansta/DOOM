@@ -123,9 +123,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Image Include="walltext.png" />
-  </ItemGroup>
-  <ItemGroup>
+    <ClInclude Include="enemy.h" />
     <ClInclude Include="image.h" />
     <ClInclude Include="input.h" />
     <ClInclude Include="render_stuff.h" />

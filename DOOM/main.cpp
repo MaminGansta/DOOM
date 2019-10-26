@@ -154,14 +154,6 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		return -1;
 	}
 
-	uint32_t* floor_texture = NULL; // textures for the walls
-	size_t floor_size = 0;  // texture dimensions (it is a square)
-	size_t floor_cnt = 0;   // number of different textures in the image
-	if (!load_texture("floor.png", floor_texture, floor_size, floor_cnt))
-	{
-		add_log("floor texture can't be load");
-		return -1;
-	}
 
 	// input
 	Input input;
@@ -248,10 +240,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 		// Movement
 		if (input.buttons[BUTTON_RROTATE].is_down)
-			player_a += 0.0000029f * nFrameTime;
+			player_a += 0.0000025f * nFrameTime;
 
 		if (input.buttons[BUTTON_LROTATE].is_down)
-			player_a -= 0.0000029f * nFrameTime;
+			player_a -= 0.0000025f * nFrameTime;
 
 		player_a = fmod(player_a, 2 * PI);
 
@@ -373,8 +365,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				float cx = player_x + t * cos(angle);
 				float cy = player_y + t * sin(angle);
 
-				size_t pix_x = cx * map_cell_w;
-				size_t pix_y = cy * map_cell_h;
+				size_t pix_x = cy * map_cell_w;
+				size_t pix_y = cx * map_cell_h;
 				surface.memory[pix_x + pix_y * surface.width] = pack_color(240, 240, 240);
 
 				// ray casting
@@ -416,14 +408,14 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				int y = i * map_cell_h;
 
 				if (map[i * map_w + j] != ' ')
-					draw_rectangle(&surface, x, y, map_cell_w, map_cell_h, colors[map[i * map_w + j] - 48]); // -48 get id from char
+					draw_rectangle(&surface, y, x, map_cell_w, map_cell_h, colors[map[i * map_w + j] - 48]); // -48 get id from char
 				//else
 					//draw_rectangle(&surface, x, y, map_cell_w, map_cell_h, pack_color(255, 255, 255));
 			}
 		}
 
 		// draw player on map
-		draw_rectangle(&surface, player_x * map_cell_w - 2, player_y * map_cell_h - 2, 5, 5, pack_color(60, 60, 60));
+		draw_rectangle(&surface, player_y * map_cell_w - 2, player_x * map_cell_h - 2, 5, 5, pack_color(60, 60, 60));
 
 
 		
