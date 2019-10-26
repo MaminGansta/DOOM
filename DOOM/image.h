@@ -31,8 +31,10 @@ inline bool load_texture(const std::string filename, uint32_t*& texture, size_t&
 
 	if (nchannels == 4)
 	{
-		for (int j = 0; j < h; j++) {
-			for (int i = 0; i < w; i++) {
+		for (int j = 0; j < h; j++)
+		{
+			for (int i = 0; i < w; i++)
+			{
 				uint8_t r = pixmap[(i + j * w) * 4 + 0];
 				uint8_t g = pixmap[(i + j * w) * 4 + 1];
 				uint8_t b = pixmap[(i + j * w) * 4 + 2];
@@ -43,8 +45,10 @@ inline bool load_texture(const std::string filename, uint32_t*& texture, size_t&
 	}
 	else if (nchannels == 3)
 	{
-		for (int j = 0; j < h; j++) {
-			for (int i = 0; i < w; i++) {
+		for (int j = 0; j < h; j++)
+		{
+			for (int i = 0; i < w; i++)
+			{
 				uint8_t r = pixmap[(i + j * w) * 3 + 0];
 				uint8_t g = pixmap[(i + j * w) * 3 + 1];
 				uint8_t b = pixmap[(i + j * w) * 3 + 2];
@@ -61,10 +65,9 @@ inline bool load_texture(const std::string filename, uint32_t*& texture, size_t&
 inline void texture_column(uint32_t* out_colum, const uint32_t* img, const size_t texsize, const size_t ntextures, const size_t texid, const size_t texcoord, const size_t column_height) {
 	const size_t img_w = texsize * ntextures;
 	const size_t img_h = texsize;
-	//uint32_t* column = (uint32_t*)_alloca(sizeof(uint32_t) * column_height);
-	//assert(column);
 
-	for (size_t y = 0; y < column_height; y++) {
+	for (size_t y = 0; y < column_height; y++)
+	{
 		size_t pix_x = texid * texsize + texcoord;
 		size_t pix_y = (y * texsize) / column_height;
 		out_colum[y] = img[pix_x + pix_y * img_w];

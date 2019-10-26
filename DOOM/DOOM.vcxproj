@@ -125,10 +125,12 @@
   <ItemGroup>
     <ClInclude Include="enemy.h" />
     <ClInclude Include="image.h" />
+    <ClInclude Include="Imp.h" />
     <ClInclude Include="input.h" />
     <ClInclude Include="render_stuff.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="timer.h" />
+    <ClInclude Include="vector.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />

@@ -2,13 +2,16 @@
 #include <cstdint>
 #include <cassert>
 
+#include "vector.h"
+
+#include "enemy.h"
 #include "input.h"
 #include "timer.h"
 #include "image.h"
 #include "Log/log.h"
 #include "render_stuff.h"
 
-
+using namespace m::vector;
 using namespace m::Timer;
 #define PI 3.14159265359f
 
@@ -73,17 +76,17 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	HDC hdc = GetDC(window);
 
 	// GAME VARS------------------------------
-	uint32_t column[2048];
+	uint32_t* column = new uint32_t[2048];
+	uint32_t* depth_buffer = new uint32_t[1980];
 
-	float player_x = 2.499; // player x position
-	float player_y = 2.645; // player y position
+	float player_x = 2.0f; // player x position
+	float player_y = 2.0f; // player y position
 	float player_a = 1.523; // player view direction
 
 
 	// speed
 	float speed_limit = 0.0000045f;
 	float speed_change = 0.000000000015f;
-	int speed_y_dir = 1;
 
 	// speed x
 	float speed_angle_x = 0.0f;
@@ -95,7 +98,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	float speed_angle_y = 0.0f;
 	float speed_y = 0.0f;
 	bool moving_y = false;
-
+	int speed_y_dir = 1;
 
 
 
@@ -154,6 +157,18 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		return -1;
 	}
 
+	// create enemies
+	vector<Enemy*> enemies;
+
+	uint32_t* imp_spr = NULL;
+	size_t imp_size = 0;
+	size_t imp_cnt = 0;
+	if (!load_texture("imp_sprites.png", imp_spr, imp_size, imp_cnt))
+	{
+		return -1;
+	}
+
+	enemies.push_back(new Enemy(100, 2, 7, 0, imp_spr));
 
 	// input
 	Input input;
@@ -166,6 +181,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	timer_init();
 	while (running)
 	{
+
+		for (int i = 0; i < 1980; i++)
+			depth_buffer[i] = 1e3;
 
 		// Input
 		MSG msg;
@@ -359,34 +377,34 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 			}
 
-
+			// ray casting
 			for (float t = 0.0f; t < 20; t += 0.025f)
 			{
 				float cx = player_x + t * cos(angle);
 				float cy = player_y + t * sin(angle);
 
+				// ray on map
 				size_t pix_x = cy * map_cell_w;
 				size_t pix_y = cx * map_cell_h;
 				surface.memory[pix_x + pix_y * surface.width] = pack_color(240, 240, 240);
 
-				// ray casting
+				// walls
 				if (map[int(cx) + int(cy) * map_w] != ' ')
 				{
 					size_t column_height = min(2048, (win_h / t / cos(angle - player_a)));
 					int texid = (int)map[int(cx) + int(cy) * map_w] - 48;
 
-
-					float hitx = cx - floor(cx + 0.5f); 
-					float hity = cy - floor(cy + 0.5f); 
+					float hitx = cx - floor(cx + 0.5f);
+					float hity = cy - floor(cy + 0.5f);
 					int x_texcoord = hitx * walltext_size;
 					if (std::abs(hity) > std::abs(hitx))
 					{
 						x_texcoord = hity * walltext_size;
 					}
-					if (x_texcoord < 0) x_texcoord += walltext_size; 
+					if (x_texcoord < 0) x_texcoord += walltext_size;
 					assert(x_texcoord >= 0 && x_texcoord < (int)walltext_size);
 
-					
+
 					texture_column(column, walltext, walltext_size, walltext_cnt, texid, x_texcoord, column_height);
 					pix_x = i;
 					for (size_t j = 0; j < column_height; j++) {
@@ -396,6 +414,12 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 					}
 					break;
 				}
+
+				// distance to enemy
+				for (int m = 0; m < enemies.size(); m++)
+					if ((int)enemies[m]->m_pos_x == (int)cx && (int)enemies[m]->m_pos_y == (int)cy)
+						enemies[m]->m_distance = sqrt(pow(abs(cy) - abs(enemies[m]->m_pos_y), 2) + pow(abs(cx) - abs(enemies[m]->m_pos_x), 2));
+				
 			}
 		}
 
@@ -416,9 +440,34 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 		// draw player on map
 		draw_rectangle(&surface, player_y * map_cell_w - 2, player_x * map_cell_h - 2, 5, 5, pack_color(60, 60, 60));
-
-
 		
+		// enemies
+		for (int n = 0; n < enemies.size(); n++)
+		{
+			// absolute direction from the player to the sprite (in radians)
+			float sprite_dir = atan2(enemies[n]->m_pos_y - player_y, enemies[n]->m_pos_x - player_x);
+			// remove unnecessary periods from the relative direction
+			while (sprite_dir - player_a > PI) sprite_dir -= 2 * PI;
+			while (sprite_dir - player_a < -PI) sprite_dir += 2 * PI;
+
+			// distance from the player to the sprite
+			float sprite_dist = sqrt(pow(player_x - enemies[n]->m_pos_x, 2) + pow(player_y - enemies[n]->m_pos_y, 2));
+			size_t sprite_screen_size = min(2000, static_cast<int>(win_h / sprite_dist));
+			// do not forget the 3D view takes only a half of the frame buffer, thus fb.w/2 for the screen width
+			int h_offset = (sprite_dir - player_a) * (win_w) / (fov) + (win_w) / 2 - sprite_screen_size / 2;
+			int v_offset = win_h / 2 - sprite_screen_size / 2;
+
+			for (size_t i = 0; i < sprite_screen_size; i++) {
+				if (h_offset + int(i) < 0 || h_offset + i >= win_w) continue;
+				for (size_t j = 0; j < sprite_screen_size; j++) {
+					if (v_offset + int(j) < 0 || v_offset + j >= win_h) continue;
+					//fb.set_pixel(fb.w / 2 + h_offset + i, v_offset + j, pack_color(0, 0, 0));
+					surface.memory[2 + h_offset + i + (v_offset + j) * win_w] = pack_color(0, 0, 0);
+				}
+			}
+		}
+
+
 
 
 		// Render
