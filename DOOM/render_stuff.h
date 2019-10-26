@@ -18,6 +18,13 @@ inline uint32_t pack_color(const uint8_t r, const uint8_t g, const uint8_t b, co
 	return ((uint32_t)a << 24) + ((uint32_t)r << 16) + ((uint32_t)b << 8) + g;
 }
 
+void unpack_color(const uint32_t& color, uint8_t& r, uint8_t& g, uint8_t& b, uint8_t& a) {
+	g = (color >> 0) & 255;
+	b = (color >> 8) & 255;
+	r = (color >> 16) & 255;
+	a = (color >> 24) & 255;
+}
+
 inline void draw_rectangle(Render_State* surface, const size_t x, const size_t y, const size_t w, const size_t h, const uint32_t color)
 {
 	//assert(img.size() == (img_w * img_h));

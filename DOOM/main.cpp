@@ -163,7 +163,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	uint32_t* imp_spr = NULL;
 	size_t imp_size = 0;
 	size_t imp_cnt = 0;
-	if (!load_texture("imp_sprites.png", imp_spr, imp_size, imp_cnt))
+	if (!load_texture("imp.png", imp_spr, imp_size, imp_cnt))
 	{
 		return -1;
 	}
@@ -457,12 +457,22 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			int h_offset = (sprite_dir - player_a) * (win_w) / (fov) + (win_w) / 2 - sprite_screen_size / 2;
 			int v_offset = win_h / 2 - sprite_screen_size / 2;
 
-			for (size_t i = 0; i < sprite_screen_size; i++) {
+			for (size_t i = 0; i < sprite_screen_size; i++)
+			{
 				if (h_offset + int(i) < 0 || h_offset + i >= win_w) continue;
-				for (size_t j = 0; j < sprite_screen_size; j++) {
+				for (size_t j = 1; j < sprite_screen_size; j++)
+				{
 					if (v_offset + int(j) < 0 || v_offset + j >= win_h) continue;
-					//fb.set_pixel(fb.w / 2 + h_offset + i, v_offset + j, pack_color(0, 0, 0));
-					surface.memory[2 + h_offset + i + (v_offset + j) * win_w] = pack_color(0, 0, 0);
+					uint32_t color = enemies[n]->sprites[(int)(i * (float)imp_size / sprite_screen_size) +  (int)(imp_size - j * (float)imp_size / sprite_screen_size) * imp_cnt * imp_size];
+					
+					// filter the background
+					uint8_t a, r, g, b;
+					unpack_color(color, r, g, b, a);
+					if (r < 140 && b > 60 && g > 55) continue;
+
+					surface.memory[h_offset + i + (v_offset + j) * win_w] = color;
+					
+					//StretchDIBits(hdc, 0, 0, surface.width, surface.height, 0, 0, surface.width, surface.height, surface.memory, &surface.bitmap_info, DIB_RGB_COLORS, SRCCOPY);
 				}
 			}
 		}
