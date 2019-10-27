@@ -3,9 +3,11 @@
 #include <cassert>
 //#include <vector>
 
-#include "vector.h"
+#include "lib/vector.h"
+#include "lib/algorithms.h"
 
-#include "enemy.h"
+#include "enemies/enemy.h"
+#include "enemies/imp.h"
 #include "input.h"
 #include "timer.h"
 #include "image.h"
@@ -169,7 +171,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		return -1;
 	}
 
-	enemies.push_back(new Enemy(100, 2, 7, 0, imp_spr));
+	Imp::sprites = imp_spr;
+	enemies.push_back(new Imp(100, 2, 7, 0));
+	enemies.push_back(new Imp(100, 1.5f, 8, 0));
 
 	// input
 	Input input;
@@ -471,7 +475,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				{
 					if (v_offset + int(j) < 0 || v_offset + j >= win_h) continue;
 
-					uint32_t color = enemies[n]->sprites[(int)(i * (float)imp_size / sprite_screen_size) +  (int)(imp_size - j * (float)imp_size / sprite_screen_size) * imp_cnt * imp_size];
+					uint32_t color = Imp::sprites[(int)(i * (float)imp_size / sprite_screen_size) +  (int)(imp_size - j * (float)imp_size / sprite_screen_size) * imp_cnt * imp_size];
 					
 					// filter the background
 					uint8_t a, r, g, b;
@@ -481,6 +485,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				}
 			}
 		}
+
+		// sort enemies
+		m::sort(enemies.begin(), enemies.end(), [](Enemy* a, Enemy* b) { return a->m_distance > b->m_distance; });
 
 
 		// Render

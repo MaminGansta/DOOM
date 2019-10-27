@@ -30,13 +30,16 @@
     <ClInclude Include="image.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="enemy.h">
+    <ClInclude Include="enemies\enemy.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vector.h">
+    <ClInclude Include="enemies\imp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Imp.h">
+    <ClInclude Include="lib\algorithms.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\vector.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
