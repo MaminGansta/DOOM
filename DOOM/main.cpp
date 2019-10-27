@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <cstdint>
 #include <cassert>
+//#include <vector>
 
 #include "vector.h"
 
@@ -31,7 +32,7 @@ LRESULT CALLBACK win_callback(HWND hwnd, UINT uMsg, WPARAM wparam, LPARAM lParam
 			running = false;
 		} break;
 
-		case WM_SIZE:
+		case WM_SIZE:  
 		{
 			RECT rect;
 			GetClientRect(hwnd, &rect);
@@ -77,7 +78,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 	// GAME VARS------------------------------
 	uint32_t* column = new uint32_t[2048];
-	uint32_t* depth_buffer = new uint32_t[1980];
+	float* depth_buffer = new float[1980];
 
 	float player_x = 2.0f; // player x position
 	float player_y = 2.0f; // player y position
@@ -181,7 +182,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	timer_init();
 	while (running)
 	{
-
+		// clear the depth_buffer
 		for (int i = 0; i < 1980; i++)
 			depth_buffer[i] = 1e3;
 
@@ -250,7 +251,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		}
 
 
-		// Break Point
+		// Break Point here
 		if (DEBUG)
 		{
 			DEBUG = false;
@@ -360,7 +361,6 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			if (i == 0)
 			{
 				 draw_rectangle(&surface, 0,  0,         win_w, win_h / 2, pack_color(130, 130, 130));
-				//draw_rectangle(&surface, 0,  win_h / 2, win_w, win_h / 2, pack_color(255, 255, 255));
 
 				// sky
 				//double ratio = (double)win_h * win_w / (sky_size * background_size);  // it just work without any scaling (i don't know why)
@@ -368,10 +368,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				{
 					for (int x = 0; x < win_w; x++)
 					{
-						int scale_y = y;
-						int scale_x = x;
+						//int scale_y = y * ratio;
+						//int scale_x = x * ratio;
 
-						surface.memory[y * win_w + x] = sky[scale_y * sky_size + scale_x];
+						surface.memory[y * win_w + x] = sky[y* sky_size + x];
 					}
 				}
 
@@ -411,17 +411,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 						pix_y = j + win_h / 2 - column_height / 2;
 						if (pix_y < 0 || pix_y >= win_h) continue;
 						surface.memory[pix_x + pix_y * win_w] = column[j];
+						// depth_buffer
+						depth_buffer[pix_x] = t;
 					}
 					break;
 				}
-
-				// distance to enemy
-				for (int m = 0; m < enemies.size(); m++)
-					if (fabs(enemies[m]->m_pos_x - cx) < 1e-1 && fabs(enemies[m]->m_pos_y - cy) < 1e-1 && enemies[m]->m_distance == -1)
-					{
-						enemies[m]->m_distance = sqrt(pow(abs(cy) - abs(enemies[m]->m_pos_y), 2) + pow(abs(cx) - abs(enemies[m]->m_pos_x), 2));
-					}
-				
 			}
 		}
 
@@ -435,66 +429,58 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 				if (map[i * map_w + j] != ' ')
 					draw_rectangle(&surface, y, x, map_cell_w, map_cell_h, colors[map[i * map_w + j] - 48]); // -48 get id from char
-				//else
-					//draw_rectangle(&surface, x, y, map_cell_w, map_cell_h, pack_color(255, 255, 255));
 			}
 		}
 
 		// draw player on map
 		draw_rectangle(&surface, player_y * map_cell_w - 2, player_x * map_cell_h - 2, 5, 5, pack_color(60, 60, 60));
 
-		// enemy on map
-		for (int i = 0; i < enemies.size(); i++)
-			if (enemies[i]->m_distance != -1)
-				draw_rectangle(&surface, enemies[i]->m_pos_y* map_cell_w - 2, enemies[i]->m_pos_x* map_cell_h - 2, 3, 3, pack_color(240, 10, 10));
-		
+
 		// enemies
 		for (int n = 0; n < enemies.size(); n++)
 		{
-			// ray didn't touch it
-			if (enemies[n]->m_distance == -1)
-				continue;
-
 			// absolute direction from the player to the sprite (in radians)
 			float sprite_dir = atan2(enemies[n]->m_pos_y - player_y, enemies[n]->m_pos_x - player_x);
+			
 			// remove unnecessary periods from the relative direction
 			while (sprite_dir - player_a > PI) sprite_dir -= 2 * PI;
 			while (sprite_dir - player_a < -PI) sprite_dir += 2 * PI;
 
 			// distance from the player to the sprite
-			float sprite_dist = sqrt(pow(player_x - enemies[n]->m_pos_x, 2) + pow(player_y - enemies[n]->m_pos_y, 2));
-			size_t sprite_screen_size = min(2000, static_cast<int>(win_h / sprite_dist));
-			// do not forget the 3D view takes only a half of the frame buffer, thus fb.w/2 for the screen width
+			enemies[n]->m_distance = sqrt(pow(player_x - enemies[n]->m_pos_x, 2) + pow(player_y - enemies[n]->m_pos_y, 2));
+			size_t sprite_screen_size = min(2000, static_cast<int>(win_h / enemies[n]->m_distance));
+
 			int h_offset = (sprite_dir - player_a) * (win_w) / (fov) + (win_w) / 2 - sprite_screen_size / 2;
 			int v_offset = win_h / 2 - sprite_screen_size / 2;
+
+			// enemy on map
+			if (fabs(sprite_dir - player_a) < fov / 2 && enemies[n]->m_distance < 20 && depth_buffer[h_offset] > enemies[n]->m_distance)
+				draw_rectangle(&surface, enemies[n]->m_pos_y * map_cell_w - 2, enemies[n]->m_pos_x * map_cell_h - 2, 3, 3, pack_color(240, 10, 10));
 
 			for (size_t i = 0; i < sprite_screen_size; i++)
 			{
 				if (h_offset + int(i) < 0 || h_offset + i >= win_w) continue;
+				
+				if (depth_buffer[h_offset + int(i)] > enemies[n]->m_distance)
+				{
+					depth_buffer[h_offset + int(i)] = enemies[n]->m_distance;
+				}
+				else continue;
+
 				for (size_t j = 1; j < sprite_screen_size; j++)
 				{
 					if (v_offset + int(j) < 0 || v_offset + j >= win_h) continue;
+
 					uint32_t color = enemies[n]->sprites[(int)(i * (float)imp_size / sprite_screen_size) +  (int)(imp_size - j * (float)imp_size / sprite_screen_size) * imp_cnt * imp_size];
 					
 					// filter the background
 					uint8_t a, r, g, b;
 					unpack_color(color, r, g, b, a);
 					if (r < 140 && b > 60 && g > 55) continue;
-
 					surface.memory[h_offset + i + (v_offset + j) * win_w] = color;
-					
-					//StretchDIBits(hdc, 0, 0, surface.width, surface.height, 0, 0, surface.width, surface.height, surface.memory, &surface.bitmap_info, DIB_RGB_COLORS, SRCCOPY);
 				}
 			}
 		}
-
-
-		// clearing the enemies distance
-		for (int i = 0; i < enemies.size(); i++)
-		{
-			enemies[i]->m_distance = -1;
-		}
-
 
 
 		// Render

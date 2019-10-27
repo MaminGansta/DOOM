@@ -27,7 +27,6 @@ void unpack_color(const uint32_t& color, uint8_t& r, uint8_t& g, uint8_t& b, uin
 
 inline void draw_rectangle(Render_State* surface, const size_t x, const size_t y, const size_t w, const size_t h, const uint32_t color)
 {
-	//assert(img.size() == (img_w * img_h));
 	for (size_t i = 0; i < w; i++)
 	{
 		for (size_t j = 0; j < h; j++) {
