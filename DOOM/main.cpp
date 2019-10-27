@@ -144,21 +144,22 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	uint32_t* walltext = NULL; // textures for the walls
 	size_t walltext_size;  // texture dimensions (it is a square)
 	size_t walltext_cnt;   // number of different textures in the image
-	if (!load_texture("walls2.png", walltext, walltext_size, walltext_cnt))
-	{
-		add_log("texture can't be load");
+	if (!load_texture("textures/walls2.png", walltext, walltext_size, walltext_cnt))
 		return -1;
-	}
 
 	// load background
 	uint32_t* sky = NULL; // textures for the walls
 	size_t sky_size = 0;  // texture dimensions (it is a square)
 	size_t sky_cnt = 0;   // number of different textures in the image
-	if (!load_texture("sky4.png", sky, sky_size, sky_cnt))
-	{
-		add_log("sky texture can't be load");
+	if (!load_texture("textures/sky4.png", sky, sky_size, sky_cnt))
 		return -1;
-	}
+
+	// load gun
+	uint32_t* pistol = NULL;
+	size_t pistol_size = 0;
+	size_t pistol_cnt = 0;
+	if (!load_texture("textures/pistol.png", pistol, pistol_size, pistol_cnt))
+		return -1;
 
 	// create enemies
 	vector<Enemy*> enemies;
@@ -166,10 +167,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	uint32_t* imp_spr = NULL;
 	size_t imp_size = 0;
 	size_t imp_cnt = 0;
-	if (!load_texture("imp.png", imp_spr, imp_size, imp_cnt))
-	{
+	if (!load_texture("textures/imp.png", imp_spr, imp_size, imp_cnt))
 		return -1;
-	}
 
 	Imp::sprites = imp_spr;
 	enemies.push_back(new Imp(100, 2, 7, 0));
@@ -489,6 +488,26 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		// sort enemies
 		m::sort(enemies.begin(), enemies.end(), [](Enemy* a, Enemy* b) { return a->m_distance > b->m_distance; });
 
+
+		// draw gun
+		int text_id = 0;
+		int gun_h = int(win_h / 2.3f);
+		int gun_w = win_w / 3;
+
+		for (int i = 0; i < gun_h; i++)
+		{
+			for (int j = 0; j < gun_w; j++)
+			{
+				uint32_t color = pistol[(int)((gun_h - i) * ((float)pistol_size / gun_h)) * pistol_size * pistol_cnt + (int)(j * ((float)pistol_size / gun_w))];
+
+				// filter the background
+				uint8_t a, r, g, b;
+				unpack_color(color, r, g, b, a);
+				if (r < 80 && b > 90 && g > 85) continue;
+
+				surface.memory[i * win_w + j + (int)(win_w / 2.5f)] = color;
+			}
+		}
 
 		// Render
 		StretchDIBits(hdc, 0, 0, surface.width, surface.height, 0, 0, surface.width, surface.height, surface.memory, &surface.bitmap_info, DIB_RGB_COLORS, SRCCOPY);
