@@ -417,8 +417,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 				// distance to enemy
 				for (int m = 0; m < enemies.size(); m++)
-					if ((int)enemies[m]->m_pos_x == (int)cx && (int)enemies[m]->m_pos_y == (int)cy)
+					if (fabs(enemies[m]->m_pos_x - cx) < 1e-1 && fabs(enemies[m]->m_pos_y - cy) < 1e-1 && enemies[m]->m_distance == -1)
+					{
 						enemies[m]->m_distance = sqrt(pow(abs(cy) - abs(enemies[m]->m_pos_y), 2) + pow(abs(cx) - abs(enemies[m]->m_pos_x), 2));
+					}
 				
 			}
 		}
@@ -440,10 +442,19 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 		// draw player on map
 		draw_rectangle(&surface, player_y * map_cell_w - 2, player_x * map_cell_h - 2, 5, 5, pack_color(60, 60, 60));
+
+		// enemy on map
+		for (int i = 0; i < enemies.size(); i++)
+			if (enemies[i]->m_distance != -1)
+				draw_rectangle(&surface, enemies[i]->m_pos_y* map_cell_w - 2, enemies[i]->m_pos_x* map_cell_h - 2, 3, 3, pack_color(240, 10, 10));
 		
 		// enemies
 		for (int n = 0; n < enemies.size(); n++)
 		{
+			// ray didn't touch it
+			if (enemies[n]->m_distance == -1)
+				continue;
+
 			// absolute direction from the player to the sprite (in radians)
 			float sprite_dir = atan2(enemies[n]->m_pos_y - player_y, enemies[n]->m_pos_x - player_x);
 			// remove unnecessary periods from the relative direction
@@ -477,6 +488,12 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			}
 		}
 
+
+		// clearing the enemies distance
+		for (int i = 0; i < enemies.size(); i++)
+		{
+			enemies[i]->m_distance = -1;
+		}
 
 
 
