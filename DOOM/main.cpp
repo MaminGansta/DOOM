@@ -104,6 +104,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	int speed_y_dir = 1;
 
 
+	// gun shift
+	int gun_shift = 0;
+	int gun_shift_dir = 1;
+
 
 	// map
 	const size_t map_w = 16; // map width
@@ -151,7 +155,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	uint32_t* sky = NULL; // textures for the walls
 	size_t sky_size = 0;  // texture dimensions (it is a square)
 	size_t sky_cnt = 0;   // number of different textures in the image
-	if (!load_texture("textures/sky4.png", sky, sky_size, sky_cnt))
+	if (!load_texture("textures/sky1.png", sky, sky_size, sky_cnt))
 		return -1;
 
 	// load gun
@@ -366,15 +370,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				 draw_rectangle(&surface, 0,  0,         win_w, win_h / 2, pack_color(130, 130, 130));
 
 				// sky
-				//double ratio = (double)win_h * win_w / (sky_size * background_size);  // it just work without any scaling (i don't know why)
 				for (int y = win_h / 2; y < win_h; y++)
 				{
 					for (int x = 0; x < win_w; x++)
 					{
-						//int scale_y = y * ratio;
-						//int scale_x = x * ratio;
+						uint32_t color = sky[(int)(y * ((float)sky_size / win_h / 2)) * sky_size + (int)(x * ((float)sky_size / win_w))];
 
-						surface.memory[y * win_w + x] = sky[y* sky_size + x];
+						surface.memory[y * win_w + x] = color;
 					}
 				}
 
@@ -474,7 +476,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				{
 					if (v_offset + int(j) < 0 || v_offset + j >= win_h) continue;
 
-					uint32_t color = Imp::sprites[(int)(i * (float)imp_size / sprite_screen_size) +  (int)(imp_size - j * (float)imp_size / sprite_screen_size) * imp_cnt * imp_size];
+					uint32_t color = Imp::sprites[(int)(i * (float)imp_size / sprite_screen_size) +  (int)((sprite_screen_size - j) * (float)imp_size / sprite_screen_size) * imp_cnt * imp_size];
 					
 					// filter the background
 					uint8_t a, r, g, b;
@@ -490,6 +492,14 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 
 		// draw gun
+		if (gun_shift < 0)
+			gun_shift_dir = 1;
+		if (gun_shift > 10)
+			gun_shift_dir = -1;
+		if (fabs(speed_x) > 1e-7 || fabs(speed_y) > 1e-7)
+			gun_shift += gun_shift_dir * nFrameTime * (fabs(speed_x) + fabs(speed_y));
+				
+
 		int text_id = 0;
 		int gun_h = int(win_h / 2.3f);
 		int gun_w = win_w / 3;
@@ -498,14 +508,16 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		{
 			for (int j = 0; j < gun_w; j++)
 			{
-				uint32_t color = pistol[(int)((gun_h - i) * ((float)pistol_size / gun_h)) * pistol_size * pistol_cnt + (int)(j * ((float)pistol_size / gun_w))];
+				uint32_t color = pistol[(int)((gun_h - i) * ((float)pistol_size / gun_h)) * pistol_size * pistol_cnt + (int)(j * ((float)pistol_size / gun_w)) + pistol_size * text_id];
 
 				// filter the background
 				uint8_t a, r, g, b;
 				unpack_color(color, r, g, b, a);
 				if (r < 80 && b > 90 && g > 85) continue;
 
-				surface.memory[i * win_w + j + (int)(win_w / 2.5f)] = color;
+				if ((i + gun_shift - 20) * win_w + j + (int)(win_w / 2.5f) < 0) continue;
+
+				surface.memory[(i + gun_shift - 20) * win_w + j + (int)(win_w / 2.5f)] = color;
 			}
 		}
 
