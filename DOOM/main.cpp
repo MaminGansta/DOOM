@@ -105,7 +105,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 
 	// gun shift
-	int gun_shift = 0;
+	int pause_shift = 1000;
+	float gun_shift = 0;
 	int gun_shift_dir = 1;
 
 
@@ -497,8 +498,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		if (gun_shift > 10)
 			gun_shift_dir = -1;
 		if (fabs(speed_x) > 1e-7 || fabs(speed_y) > 1e-7)
-			gun_shift += gun_shift_dir * nFrameTime * (fabs(speed_x) + fabs(speed_y));
-				
+		{
+			gun_shift += gun_shift_dir * (float)nFrameTime / 40000;
+		}
 
 		int text_id = 0;
 		int gun_h = int(win_h / 2.3f);
@@ -515,9 +517,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				unpack_color(color, r, g, b, a);
 				if (r < 80 && b > 90 && g > 85) continue;
 
-				if ((i + gun_shift - 20) * win_w + j + (int)(win_w / 2.5f) < 0) continue;
+				if ((i + (int)gun_shift - 20) * win_w + j + (int)(win_w / 2.9f) < 0) continue;
 
-				surface.memory[(i + gun_shift - 20) * win_w + j + (int)(win_w / 2.5f)] = color;
+				surface.memory[(i + (int)gun_shift - 20) * win_w + j + (int)(win_w / 2.9f)] = color;
 			}
 		}
 
