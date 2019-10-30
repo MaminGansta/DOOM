@@ -13,10 +13,6 @@ struct Enemy
 
 	inline Enemy(int hp, float x, float y, float angle) : m_hp(hp), m_pos_x(x), m_pos_y(y), m_agle(angle){}
 
-	inline ~Enemy()
-	{
-		delete[] sprites;
-	}
 };
 
 uint32_t* Enemy::sprites = NULL;

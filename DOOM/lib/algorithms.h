@@ -3,7 +3,7 @@
 namespace m{
 
 	template <typename T>
-	T* find(T* p, T* q, T elem)
+	inline T* find(T* p, T* q, T elem)
 	{
 		T* needed = &elem;
 		for (; p != q + 1; ++p)
@@ -14,7 +14,7 @@ namespace m{
 	}
 
 	template <typename T>
-	T* maxel(T* p, T* q)
+	inline T* maxel(T* p, T* q)
 	{
 		T* max = p;
 		for (; p != q + 1; ++p)
@@ -25,7 +25,7 @@ namespace m{
 	}
 
 	template <typename T>
-	T* minel(T* p, T* q) {
+	inline T* minel(T* p, T* q) {
 		T* min = p;
 		for (; p != q + 1; ++p)
 			if (*min >= *p)
@@ -35,7 +35,7 @@ namespace m{
 	}
 
 	template <typename T>
-	T* lower_bound(T* p, T* q, T elem) {
+	inline T* lower_bound(T* p, T* q, T elem) {
 		T* min = &elem;
 		for (; p != q + 1; ++p)
 			if (*min >= *p)
@@ -45,7 +45,7 @@ namespace m{
 	}
 
 	template <typename T>
-	T* uper_bound(T* p, T* q, T elem) {
+	inline T* uper_bound(T* p, T* q, T elem) {
 		T* max = & elem;
 		for (; p != q + 1; ++p)
 			if (*max <= *p)
@@ -57,7 +57,7 @@ namespace m{
 
 
 	template <typename T>
-	void sort(T* left, T* right) {
+	inline void sort(T* left, T* right) {
 
 		T* i = left, * j = right;
 		T tmp;
@@ -86,7 +86,7 @@ namespace m{
 
 
 	template <typename T, typename F>
-	void sort(T* left, T* right, F comp) {
+	inline void sort(T* left, T* right, F comp) {
 
 		T* i = left, * j = right;
 		T tmp;

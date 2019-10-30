@@ -82,9 +82,15 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	uint32_t* column = new uint32_t[2048];
 	float* depth_buffer = new float[1980];
 
+	// player position
 	float player_x = 2.0f; // player x position
 	float player_y = 2.0f; // player y position
 	float player_a = 1.523; // player view direction
+	float player_step = 0.0f; // one step distance
+
+	// before calculation, for collision detection
+	float new_player_x = player_x;
+	float new_player_y = player_y;
 
 
 	// speed
@@ -105,7 +111,6 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 
 	// gun shift
-	int pause_shift = 1000;
 	float gun_shift = 0;
 	int gun_shift_dir = 1;
 
@@ -334,28 +339,54 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				speed_y = speed_y > -0.0000001f ? 0.0f : speed_y + speed_change * nFrameTime;
 		}
 
-		player_x += nFrameTime * cosf(player_a)  * speed_x;
-		player_y += nFrameTime * sinf(player_a)  * speed_x;
+		// x direction
+		new_player_x += nFrameTime * cosf(player_a)  * speed_x;
+		new_player_y += nFrameTime * sinf(player_a)  * speed_x;
 
+		// y direction
+		new_player_x += nFrameTime * cosf(player_a + PI / 2) * speed_y;
+		new_player_y += nFrameTime * sinf(player_a + PI / 2) * speed_y;
+
+		
 		// Collision detection
-		if (map[(int)(player_y + 0.15f) * map_w + (int)(player_x + 0.15f)] != ' ' ||
-			map[(int)(player_y - 0.15f) * map_w + (int)(player_x - 0.15f)] != ' ')
+		if ((new_player_x > 0 && new_player_x < map_cell_w * map_cell_h && new_player_y > 0 && new_player_y < map_cell_w * map_cell_w) &&
+			(map[(int)(new_player_y + 0.15f) * map_w + (int)(new_player_x + 0.15f)] != ' ' ||
+			 map[(int)(new_player_y - 0.15f) * map_w + (int)(new_player_x - 0.15f)] != ' '))
 		{
-			player_x -= nFrameTime * cosf(player_a) * speed_x;
-			player_y -= nFrameTime * sinf(player_a) * speed_x;
+			// if wall
+			float x_dif = new_player_x - player_x;
+			float y_dif = new_player_y - player_y;
+
+			// horizontal wall collision
+			if (map[(int)(player_y + 0.15f + y_dif) * map_w + (int)(player_x + 0.15f)] == ' ' &&
+				map[(int)(player_y - 0.15f + y_dif) * map_w + (int)(player_x - 0.15f)] == ' ')
+			{
+				player_step = fabs(y_dif);
+				player_y = new_player_y = player_y + y_dif; // slide on the horizontal wall
+				new_player_x = player_x;
+
+			}
+			// vertical wall collision
+			else if (map[(int)(player_y + 0.15f) * map_w + (int)(player_x + 0.15f + x_dif)] == ' ' &&
+				     map[(int)(player_y - 0.15f) * map_w + (int)(player_x - 0.15f + x_dif)] == ' ')
+			{
+				player_step = fabs(x_dif);
+				new_player_y = player_y;
+				player_x = new_player_x = player_x + x_dif; // slide on the vertical wall
+			}
+			else
+			{
+				player_step = 0; //fabs(fabs(new_player_y) - fabs(player_y)) + fabs(fabs(new_player_x) - fabs(player_x));
+				new_player_y = player_y;
+				new_player_x = player_x;
+			}
 		}
-
-		player_x += nFrameTime * cosf(player_a + PI / 2) * speed_y;
-		player_y += nFrameTime * sinf(player_a + PI / 2) * speed_y;
-
-		// Collision detection
-		if (map[(int)(player_y + 0.15f) * map_w + (int)(player_x + 0.15f)] != ' ' ||
-			map[(int)(player_y - 0.15f) * map_w + (int)(player_x - 0.15f)] != ' ')
+		else // no wall on the way
 		{
-			player_x -= nFrameTime * cosf(player_a + PI / 2) * speed_y;
-			player_y -= nFrameTime * sinf(player_a + PI / 2) * speed_y;
+			player_step = fabs(fabs(new_player_y) - fabs(player_y)) + fabs(fabs(new_player_x) - fabs(player_x));
+			player_y = new_player_y;
+			player_x = new_player_x;
 		}
-
 
 		// Simulate
 		const float fov = PI / 3.0f; // field of view
@@ -492,17 +523,20 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		m::sort(enemies.begin(), enemies.end(), [](Enemy* a, Enemy* b) { return a->m_distance > b->m_distance; });
 
 
+
+		// gun  animation
+		int gun_texture_id = 0;
+
 		// draw gun
 		if (gun_shift < 0)
 			gun_shift_dir = 1;
 		if (gun_shift > 10)
 			gun_shift_dir = -1;
-		if (fabs(speed_x) > 1e-7 || fabs(speed_y) > 1e-7)
+		if (player_step > 1e-2)
 		{
 			gun_shift += gun_shift_dir * (float)nFrameTime / 40000;
 		}
 
-		int text_id = 0;
 		int gun_h = int(win_h / 2.3f);
 		int gun_w = win_w / 3;
 
@@ -510,9 +544,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		{
 			for (int j = 0; j < gun_w; j++)
 			{
-				uint32_t color = pistol[(int)((gun_h - i) * ((float)pistol_size / gun_h)) * pistol_size * pistol_cnt + (int)(j * ((float)pistol_size / gun_w)) + pistol_size * text_id];
+				uint32_t color = pistol[(int)((gun_h - i) * ((float)pistol_size / gun_h)) * pistol_size * pistol_cnt + (int)(j * ((float)pistol_size / gun_w)) + pistol_size * gun_texture_id];
 
-				// filter the background
+				// filter the image background
 				uint8_t a, r, g, b;
 				unpack_color(color, r, g, b, a);
 				if (r < 80 && b > 90 && g > 85) continue;
@@ -535,5 +569,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	}
 		
 	dump_log();
+	delete[] depth_buffer;
+	delete[] column;
 	return 0;
 }
