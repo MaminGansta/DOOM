@@ -6,6 +6,7 @@
 #include "lib/vector.h"
 #include "lib/algorithms.h"
 
+#include "animation/animation.h"
 #include "enemies/enemy.h"
 #include "enemies/imp.h"
 #include "input.h"
@@ -110,9 +111,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	int speed_y_dir = 1;
 
 
-	// gun shift
+	// gun shift animation
 	float gun_shift = 0;
 	int gun_shift_dir = 1;
+
+	// gun
+	int gun_texture_id = 0;
+	Animation pistol_anime(3, 60000);
 
 
 	// map
@@ -199,6 +204,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		for (int i = 0; i < 1980; i++)
 			depth_buffer[i] = 1e3;
 
+		for (int i = 0; i < BUTTON_COUNT; i++)
+			input.buttons[i].changed = false;
+
+	
 		// Input
 		MSG msg;
 		while (PeekMessage(&msg, window, 0, 0, PM_REMOVE))
@@ -215,38 +224,44 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				{
 				case VK_LEFT:
 				{
+					input.buttons[BUTTON_LROTATE].changed = true;// input.buttons[BUTTON_LROTATE].is_down != is_down;
 					input.buttons[BUTTON_LROTATE].is_down = is_down;
-					input.buttons[BUTTON_LROTATE].changed = true;
 
 				}break;
 				case VK_RIGHT:
 				{
+					input.buttons[BUTTON_RROTATE].changed = true;// input.buttons[BUTTON_RROTATE].is_down != is_down;
 					input.buttons[BUTTON_RROTATE].is_down = is_down;
-					input.buttons[BUTTON_RROTATE].changed = true;
 
 				}break;
 				case VK_W:
 				{
+					input.buttons[BUTTON_UP].changed = true;// input.buttons[BUTTON_UP].is_down != is_down;
 					input.buttons[BUTTON_UP].is_down = is_down;
-					input.buttons[BUTTON_UP].changed = true;
 
 				}break;
 				case VK_S:
 				{
+					input.buttons[BUTTON_DOWN].changed = true;// input.buttons[BUTTON_DOWN].is_down != is_down;
 					input.buttons[BUTTON_DOWN].is_down = is_down;
-					input.buttons[BUTTON_DOWN].changed = true;
 
 				}break;
 				case VK_A:
 				{
+					input.buttons[BUTTON_LEFT].changed = true;// input.buttons[BUTTON_LEFT].is_down != is_down;
 					input.buttons[BUTTON_LEFT].is_down = is_down;
-					input.buttons[BUTTON_LEFT].changed = true;
 
 				}break;
 				case VK_D:
 				{
+					input.buttons[BUTTON_RIGHT].changed = true;// input.buttons[BUTTON_RIGHT].is_down != is_down;
 					input.buttons[BUTTON_RIGHT].is_down = is_down;
-					input.buttons[BUTTON_RIGHT].changed = true;
+
+				}break;
+				case VK_SPACE:
+				{
+					input.buttons[BUTTON_SHOT].changed = true;// input.buttons[BUTTON_SHOT].is_down != is_down;
+					input.buttons[BUTTON_SHOT].is_down = is_down;
 
 				}break;
 				case VK_DEBUG:
@@ -350,16 +365,16 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		
 		// Collision detection
 		if ((new_player_x > 0 && new_player_x < map_cell_w * map_cell_h && new_player_y > 0 && new_player_y < map_cell_w * map_cell_w) &&
-			(map[(int)(new_player_y + 0.15f) * map_w + (int)(new_player_x + 0.15f)] != ' ' ||
-			 map[(int)(new_player_y - 0.15f) * map_w + (int)(new_player_x - 0.15f)] != ' '))
+			(map[(int)(new_player_y + 0.25f) * map_w + (int)(new_player_x + 0.25f)] != ' ' ||
+			 map[(int)(new_player_y - 0.25f) * map_w + (int)(new_player_x - 0.25f)] != ' '))
 		{
 			// if wall
 			float x_dif = new_player_x - player_x;
 			float y_dif = new_player_y - player_y;
 
 			// horizontal wall collision
-			if (map[(int)(player_y + 0.15f + y_dif) * map_w + (int)(player_x + 0.15f)] == ' ' &&
-				map[(int)(player_y - 0.15f + y_dif) * map_w + (int)(player_x - 0.15f)] == ' ')
+			if (map[(int)(player_y + 0.25f + y_dif) * map_w + (int)(player_x + 0.25f)] == ' ' &&
+				map[(int)(player_y - 0.25f + y_dif) * map_w + (int)(player_x - 0.25f)] == ' ')
 			{
 				player_step = fabs(y_dif);
 				player_y = new_player_y = player_y + y_dif; // slide on the horizontal wall
@@ -367,8 +382,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 			}
 			// vertical wall collision
-			else if (map[(int)(player_y + 0.15f) * map_w + (int)(player_x + 0.15f + x_dif)] == ' ' &&
-				     map[(int)(player_y - 0.15f) * map_w + (int)(player_x - 0.15f + x_dif)] == ' ')
+			else if (map[(int)(player_y + 0.25f) * map_w + (int)(player_x + 0.25f + x_dif)] == ' ' &&
+				     map[(int)(player_y - 0.25f) * map_w + (int)(player_x - 0.25f + x_dif)] == ' ')
 			{
 				player_step = fabs(x_dif);
 				new_player_y = player_y;
@@ -525,7 +540,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 
 		// gun  animation
-		int gun_texture_id = 0;
+		if (input.buttons[BUTTON_SHOT].is_down & input.buttons[BUTTON_SHOT].changed)
+			pistol_anime.add_cycle(1);
+		
+		gun_texture_id = pistol_anime.sprite(nFrameTime);
 
 		// draw gun
 		if (gun_shift < 0)
