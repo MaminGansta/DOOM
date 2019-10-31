@@ -12,7 +12,7 @@
 #include "input.h"
 #include "timer.h"
 #include "image.h"
-#include "Log/log.h"
+//#include "Log/log.h"
 #include "render_stuff.h"
 
 using namespace m::vector;
@@ -182,11 +182,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	uint32_t* imp_spr = NULL;
 	size_t imp_size = 0;
 	size_t imp_cnt = 0;
-	if (!load_texture("textures/imp.png", imp_spr, imp_size, imp_cnt))
+	if (!load_texture("textures/imp_sprites.png", imp_spr, imp_size, imp_cnt))
 		return -1;
 
 	Imp::sprites = imp_spr;
-	enemies.push_back(new Imp(100, 2, 7, 0));
+	enemies.push_back(new Imp(100, 3, 7, 0));
 	enemies.push_back(new Imp(100, 1.5f, 8, 0));
 
 	// input
@@ -292,7 +292,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		if (input.buttons[BUTTON_LROTATE].is_down)
 			player_a -= 0.0000025f * nFrameTime;
 
-		player_a = fmod(player_a, 2 * PI);
+		//player_a = fmod(player_a, 2 * PI);
+		// remove unnecessary periods from the relative direction
+		while (player_a > 2*PI) player_a -= 2 * PI;
+		while (player_a < (-2)*PI) player_a += 2 * PI;
 
 
 
@@ -491,8 +494,19 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		// enemies
 		for (int n = 0; n < enemies.size(); n++)
 		{
+			int text_id = 0;
+
 			// absolute direction from the player to the sprite (in radians)
 			float sprite_dir = atan2(enemies[n]->m_pos_y - player_y, enemies[n]->m_pos_x - player_x);
+
+			// calculate the sprite 
+			if (fabs(sprite_dir - enemies[n]->m_agle) < PI / 3)
+				text_id = 4;
+			else if (fabs(sprite_dir - enemies[n]->m_agle) > PI / 1.3f)
+				text_id = 0;
+			else if (fabs(sprite_dir - enemies[n]->m_agle) > PI / 3 || fabs(player_a - enemies[n]->m_agle) < PI / 3)
+				text_id = 2;
+			
 			
 			// remove unnecessary periods from the relative direction
 			while (sprite_dir - player_a > PI) sprite_dir -= 2 * PI;
@@ -523,7 +537,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				{
 					if (v_offset + int(j) < 0 || v_offset + j >= win_h) continue;
 
-					uint32_t color = Imp::sprites[(int)(i * (float)imp_size / sprite_screen_size) +  (int)((sprite_screen_size - j) * (float)imp_size / sprite_screen_size) * imp_cnt * imp_size];
+					uint32_t color = Imp::sprites[(int)(i * (float)imp_size / sprite_screen_size) +  (int)((sprite_screen_size - j) * (float)imp_size / sprite_screen_size) * imp_cnt * imp_size + imp_size * text_id];
 					
 					// filter the background
 					uint8_t a, r, g, b;
@@ -586,7 +600,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 	}
 		
-	dump_log();
+	//dump_log();
 	delete[] depth_buffer;
 	delete[] column;
 	return 0;
