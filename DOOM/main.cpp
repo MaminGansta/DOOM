@@ -114,6 +114,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	// gun shift animation
 	float gun_shift = 0;
 	int gun_shift_dir = 1;
+	bool shot = false;
 
 	// gun
 	int gun_texture_id = 0;
@@ -204,8 +205,12 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		for (int i = 0; i < 1980; i++)
 			depth_buffer[i] = 1e3;
 
+		// clear buttons flags
 		for (int i = 0; i < BUTTON_COUNT; i++)
 			input.buttons[i].changed = false;
+
+		// clear shot flag
+		shot = false;
 
 	
 		// Input
@@ -281,9 +286,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 		// Break Point here
 		if (DEBUG)
-		{
 			DEBUG = false;
-		}
+
+		// if shooting
+		if (input.buttons[BUTTON_SHOT].is_down & input.buttons[BUTTON_SHOT].changed)
+			shot = true;
 
 		// Movement
 		if (input.buttons[BUTTON_RROTATE].is_down)
@@ -496,6 +503,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		{
 			int text_id = 0;
 
+			// dead srite here
+			if (enemies[n]->m_hp <= 0)
+				continue;
+
 			// absolute direction from the player to the sprite (in radians)
 			float sprite_dir = atan2(enemies[n]->m_pos_y - player_y, enemies[n]->m_pos_x - player_x);
 
@@ -554,7 +565,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 
 		// gun  animation
-		if (input.buttons[BUTTON_SHOT].is_down & input.buttons[BUTTON_SHOT].changed)
+		if (shot)
 			pistol_anime.add_cycle(1);
 		
 		gun_texture_id = pistol_anime.sprite(nFrameTime);
@@ -587,6 +598,21 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 				surface.memory[(i + (int)gun_shift - 20) * win_w + j + (int)(win_w / 2.9f)] = color;
 			}
+		}
+
+		// shot handler
+		for (int i = 0; i < enemies.size(); i++)
+		{
+			// repeating but more readable
+			// absolute direction from the player to the sprite (in radians)
+			float sprite_dir = atan2(enemies[i]->m_pos_y - player_y, enemies[i]->m_pos_x - player_x);
+
+			// remove unnecessary periods from the relative direction
+			while (sprite_dir - player_a > PI) sprite_dir -= 2 * PI;
+			while (sprite_dir - player_a < -PI) sprite_dir += 2 * PI;
+
+			if (fabs(fabs(player_a) - fabs(sprite_dir)) < 1e-1 && shot)
+				enemies[i]->m_hp -= 50;
 		}
 
 		// Render
