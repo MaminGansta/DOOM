@@ -11,6 +11,9 @@ struct Enemy
 	float m_distance{1};
 	bool visible;
 	Animation death_animation{5, 100000, 1};
+	
+	bool hit{ false };
+	Animation hit_animation{ 1, 100000, 0 };
 
 	static uint32_t* death;
 	static uint32_t* sprites;

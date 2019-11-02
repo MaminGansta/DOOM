@@ -200,6 +200,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	enemies.push_back(new Imp(100, 10, 9, 0));
 	enemies.push_back(new Imp(100, 14, 11, 0));
 	enemies.push_back(new Imp(100, 6, 14.5f, 0));
+	enemies.push_back(new Imp(100, 6, 8, 0));
+	enemies.push_back(new Imp(100, 13, 3, 0));
 
 
 	// input
@@ -541,7 +543,14 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			text_id += side;
 
 			// death sprite animation
-			if (enemies[n]->m_hp <= 0)
+			if (enemies[n]->hit && enemies[n]->m_hp > 0)
+			{
+				if (enemies[n]->hit_animation.cycles)
+					text_id = enemies[n]->hit_animation.sprite(nFrameTime);
+				else
+					enemies[n]->hit = false;
+			}
+			else if (enemies[n]->m_hp <= 0)
 			{
 				int frame = enemies[n]->death_animation.sprite(nFrameTime);
 				frame = frame || enemies[n]->death_animation.cycles != 0 ? frame + 8 : frame + 12;
@@ -579,7 +588,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 					
 					enemies[n]->visible = true;
 					uint32_t color;
-					if (enemies[n]->m_hp > 0)
+					if (enemies[n]->m_hp > 0 && !enemies[n]->hit)
 						color = Imp::sprites[(int)(i * (float)imp_size / sprite_screen_size) +  (int)((sprite_screen_size - j) * (float)imp_size / sprite_screen_size) * imp_cnt * imp_size + imp_size * text_id];
 					else
 						color = Imp::death[(int)(i * (float)impd_size / sprite_screen_size) + (int)((sprite_screen_size - j) * (float)impd_size / sprite_screen_size) * impd_cnt * impd_size + impd_size * text_id];
@@ -646,8 +655,12 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			while (sprite_dir - player_a > PI) sprite_dir -= 2 * PI;
 			while (sprite_dir - player_a < -PI) sprite_dir += 2 * PI;
 
-			if (fabs(fabs(player_a) - fabs(sprite_dir)) < 1e-1 && shot && enemies[i]->visible)
+			if (fabs(fabs(player_a) - fabs(sprite_dir - 0.05f)) < 0.03f && shot && enemies[i]->visible)
+			{
 				enemies[i]->m_hp -= 50;
+				enemies[i]->hit = true;
+				enemies[i]->hit_animation.add_cycle(1);
+			}
 		}
 
 		// Render
