@@ -1,8 +1,6 @@
 #include <windows.h>
 #include <cstdint>
 #include <cassert>
-#include <sstream>
-//#include <vector>
 
 #include "lib/vector.h"
 #include "lib/algorithms.h"
@@ -16,12 +14,7 @@
 //#include "Log/log.h"
 #include "render_stuff.h"
 
-#define DBOUT( s )            \
-{                             \
-   std::ostringstream os_;    \
-   os_ << s;                   \
-   OutputDebugString( os_.str().c_str() );  \
-}
+#define DBOUT(s)  OutputDebugString(s)
 
 using namespace m::vector;
 using namespace m::Timer;
@@ -204,6 +197,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	Imp::sprites = imp_spr;
 	enemies.push_back(new Imp(100, 3, 7, 5));
 	enemies.push_back(new Imp(100, 2, 8, 0));
+	enemies.push_back(new Imp(100, 10, 9, 0));
+	enemies.push_back(new Imp(100, 14, 11, 0));
+	enemies.push_back(new Imp(100, 6, 14.5f, 0));
+
 
 	// input
 	Input input;
@@ -563,7 +560,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			int v_offset = win_h / 2 - sprite_screen_size / 2;
 
 			// enemy on map
-			if (fabs(sprite_dir - player_a) < fov / 2 && enemies[n]->m_distance < 20 && depth_buffer[h_offset] > enemies[n]->m_distance)
+			if (fabs(sprite_dir - player_a) < fov / 2 && enemies[n]->m_distance < 20 && depth_buffer[h_offset] > enemies[n]->m_distance && enemies[n]->m_hp > 0)
 				draw_rectangle(&surface, enemies[n]->m_pos_y * map_cell_w - 2, enemies[n]->m_pos_x * map_cell_h - 2, 3, 3, pack_color(240, 10, 10));
 
 			for (size_t i = 0; i < sprite_screen_size; i++)
