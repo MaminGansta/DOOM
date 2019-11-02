@@ -9,8 +9,8 @@ struct Enemy
 	float m_pos_y;
 	float m_agle;
 	float m_distance{1};
-
-	Animation death_animation{5, 200000, 1};
+	bool visible;
+	Animation death_animation{5, 100000, 1};
 
 	static uint32_t* death;
 	static uint32_t* sprites;

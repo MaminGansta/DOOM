@@ -515,6 +515,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		for (int n = 0; n < enemies.size(); n++)
 		{
 			int text_id = 0;
+			enemies[n]->visible = false;
 
 			// absolute direction from the player to the sprite (in radians)
 			float sprite_dir = atan2(enemies[n]->m_pos_y - player_y, enemies[n]->m_pos_x - player_x);
@@ -578,7 +579,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				for (size_t j = 1; j < sprite_screen_size; j++)
 				{
 					if (v_offset + int(j) < 0 || v_offset + j >= win_h) continue;
-
+					
+					enemies[n]->visible = true;
 					uint32_t color;
 					if (enemies[n]->m_hp > 0)
 						color = Imp::sprites[(int)(i * (float)imp_size / sprite_screen_size) +  (int)((sprite_screen_size - j) * (float)imp_size / sprite_screen_size) * imp_cnt * imp_size + imp_size * text_id];
@@ -647,7 +649,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			while (sprite_dir - player_a > PI) sprite_dir -= 2 * PI;
 			while (sprite_dir - player_a < -PI) sprite_dir += 2 * PI;
 
-			if (fabs(fabs(player_a) - fabs(sprite_dir)) < 1e-1 && shot)
+			if (fabs(fabs(player_a) - fabs(sprite_dir)) < 1e-1 && shot && enemies[i]->visible)
 				enemies[i]->m_hp -= 50;
 		}
 
