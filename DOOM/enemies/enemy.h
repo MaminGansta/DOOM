@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include "../animation/animation.h"
 
 struct Enemy
 {
@@ -9,6 +10,9 @@ struct Enemy
 	float m_agle;
 	float m_distance{1};
 
+	Animation death_animation{5, 200000, 1};
+
+	static uint32_t* death;
 	static uint32_t* sprites;
 
 	inline Enemy(int hp, float x, float y, float angle) : m_hp(hp), m_pos_x(x), m_pos_y(y), m_agle(angle){}
@@ -16,4 +20,5 @@ struct Enemy
 };
 
 uint32_t* Enemy::sprites = NULL;
+uint32_t* Enemy::death = NULL;
 

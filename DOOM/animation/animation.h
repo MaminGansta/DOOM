@@ -8,10 +8,10 @@ struct Animation
 	int m_nSprites_cnt;
 	int time;
 	int cur_sprite{0};
-	int cycles{ 0 };
+	int cycles;
 
 
-	inline Animation(int cnt, int time): m_nSprites_cnt(cnt), m_nSprite_time(time), time(time){}
+	inline Animation(int cnt, int time, int cycles = 0): m_nSprites_cnt(cnt), m_nSprite_time(time), time(time), cycles(cycles){}
 
 	inline int sprite(int frame_time)
 	{

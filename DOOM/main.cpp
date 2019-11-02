@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <cstdint>
 #include <cassert>
+#include <sstream>
 //#include <vector>
 
 #include "lib/vector.h"
@@ -14,6 +15,13 @@
 #include "image.h"
 //#include "Log/log.h"
 #include "render_stuff.h"
+
+#define DBOUT( s )            \
+{                             \
+   std::ostringstream os_;    \
+   os_ << s;                   \
+   OutputDebugString( os_.str().c_str() );  \
+}
 
 using namespace m::vector;
 using namespace m::Timer;
@@ -183,21 +191,26 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	uint32_t* imp_spr = NULL;
 	size_t imp_size = 0;
 	size_t imp_cnt = 0;
-	if (!load_texture("textures/imp_sprites.png", imp_spr, imp_size, imp_cnt))
+	if (!load_texture("textures/imp_movement.png", imp_spr, imp_size, imp_cnt))
 		return -1;
 
+	uint32_t* imp_death = NULL;
+	size_t impd_size = 0;
+	size_t impd_cnt = 0;
+	if (!load_texture("textures/imp_hit_death.png", imp_death, impd_size, impd_cnt))
+		return -1;
+
+	Imp::death = imp_death;
 	Imp::sprites = imp_spr;
-	enemies.push_back(new Imp(100, 3, 7, 0));
-	enemies.push_back(new Imp(100, 1.5f, 8, 0));
+	enemies.push_back(new Imp(100, 3, 7, 5));
+	enemies.push_back(new Imp(100, 2, 8, 0));
 
 	// input
 	Input input;
 
 	bool DEBUG = false;
 
-
 	// GAME LOOP---------------------------------
-
 	timer_init();
 	while (running)
 	{
@@ -289,6 +302,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			DEBUG = false;
 
 		// if shooting
+
 		if (input.buttons[BUTTON_SHOT].is_down & input.buttons[BUTTON_SHOT].changed)
 			shot = true;
 
@@ -300,9 +314,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			player_a -= 0.0000025f * nFrameTime;
 
 		//player_a = fmod(player_a, 2 * PI);
-		// remove unnecessary periods from the relative direction
 		while (player_a > 2*PI) player_a -= 2 * PI;
-		while (player_a < (-2)*PI) player_a += 2 * PI;
+		while (player_a < 0) player_a += 2 * PI;
 
 
 
@@ -503,22 +516,40 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		{
 			int text_id = 0;
 
-			// dead srite here
-			if (enemies[n]->m_hp <= 0)
-				continue;
-
 			// absolute direction from the player to the sprite (in radians)
 			float sprite_dir = atan2(enemies[n]->m_pos_y - player_y, enemies[n]->m_pos_x - player_x);
 
-			// calculate the sprite 
-			if (fabs(sprite_dir - enemies[n]->m_agle) < PI / 3)
-				text_id = 4;
-			else if (fabs(sprite_dir - enemies[n]->m_agle) > PI / 1.3f)
-				text_id = 0;
-			else if (fabs(sprite_dir - enemies[n]->m_agle) > PI / 3 || fabs(player_a - enemies[n]->m_agle) < PI / 3)
-				text_id = 2;
-			
-			
+			// calculate the side of enemy
+			float dif = sprite_dir - enemies[n]->m_agle;
+			int side = 0;
+
+			//if ((dif <= PI / 2 && dif > PI / 4))
+			//	side = 2;
+			//else if (dif  < PI / 8 && dif > -PI / 8)
+			//	side = 4;
+			//else if (dif < 2 * PI / 8 && dif > PI / 8)
+			//	side = 3;
+			//else if (dif < 0 && dif > -PI / 4)
+			//	side = 7;
+			//else if (dif < -PI / 4 && dif >(-2)* PI / 4)
+			//	side = 6;
+			//else if (dif < (-2) * PI / 4 && dif >(-3)* PI / 4)
+			//	side = 5;
+			//else if (dif < (-3) * PI / 4 && dif >(-5)* PI / 4)
+			//	side = 0;
+			////else if (dif < (-5) * PI / 4 && dif > (-6)* PI / 4);
+			//	//text_id += 1;
+
+			text_id += side;
+
+			// death sprite animation
+			if (enemies[n]->m_hp <= 0)
+			{
+				int frame = enemies[n]->death_animation.sprite(nFrameTime);
+				frame = frame || enemies[n]->death_animation.cycles != 0 ? frame + 8 : frame + 12;
+				text_id = frame;
+			}
+
 			// remove unnecessary periods from the relative direction
 			while (sprite_dir - player_a > PI) sprite_dir -= 2 * PI;
 			while (sprite_dir - player_a < -PI) sprite_dir += 2 * PI;
@@ -548,8 +579,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				{
 					if (v_offset + int(j) < 0 || v_offset + j >= win_h) continue;
 
-					uint32_t color = Imp::sprites[(int)(i * (float)imp_size / sprite_screen_size) +  (int)((sprite_screen_size - j) * (float)imp_size / sprite_screen_size) * imp_cnt * imp_size + imp_size * text_id];
-					
+					uint32_t color;
+					if (enemies[n]->m_hp > 0)
+						color = Imp::sprites[(int)(i * (float)imp_size / sprite_screen_size) +  (int)((sprite_screen_size - j) * (float)imp_size / sprite_screen_size) * imp_cnt * imp_size + imp_size * text_id];
+					else
+						color = Imp::death[(int)(i * (float)impd_size / sprite_screen_size) + (int)((sprite_screen_size - j) * (float)impd_size / sprite_screen_size) * impd_cnt * impd_size + impd_size * text_id];
+
+
 					// filter the background
 					uint8_t a, r, g, b;
 					unpack_color(color, r, g, b, a);

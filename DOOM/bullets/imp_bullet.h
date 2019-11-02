@@ -1,5 +1,6 @@
 #pragma once
 #include "bullet.h"
+#include "../animation/animation.h" 
 
 struct Imp_bullet : public Bullet
 {
