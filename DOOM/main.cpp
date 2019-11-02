@@ -655,7 +655,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			while (sprite_dir - player_a > PI) sprite_dir -= 2 * PI;
 			while (sprite_dir - player_a < -PI) sprite_dir += 2 * PI;
 
-			if (fabs(fabs(player_a) - fabs(sprite_dir - 0.05f)) < 0.03f && shot && enemies[i]->visible)
+			if (fabs(fabs(player_a) - fabs(sprite_dir - 0.07f)) < 0.07f && shot && enemies[i]->visible)
 			{
 				enemies[i]->m_hp -= 50;
 				enemies[i]->hit = true;
