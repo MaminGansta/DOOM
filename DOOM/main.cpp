@@ -223,7 +223,6 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 		// clear shot flag
 		shot = false;
-
 	
 		// Input
 		MSG msg;
@@ -294,6 +293,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			}break;
 			}
 		}
+
+		if (surface.height == 0 || surface.width == 0)
+			continue;
 
 
 		// Break Point here
@@ -668,6 +670,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 		// Log
 		//add_log(std::to_string(nFPS));
+		/*char fps[10];
+		sprintf_s(fps, "%d\n", nFPS, 10);
+		DBOUT(fps);*/
 
 		// Timer
 		timer_update();
