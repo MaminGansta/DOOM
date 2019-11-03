@@ -600,7 +600,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				
 				if (depth_buffer[h_offset + int(i)] > enemies[n]->m_distance)
 				{
-					depth_buffer[h_offset + int(i)] = enemies[n]->m_distance;
+					if (enemies[n]->m_hp > 0)
+						depth_buffer[h_offset + int(i)] = enemies[n]->m_distance;
 				}
 				else continue;
 
