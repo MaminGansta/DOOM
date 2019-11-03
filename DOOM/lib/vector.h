@@ -70,7 +70,7 @@ namespace m{
 			}
 
 			inline vector(vector&& other) {
-				arr = other.arr;
+				delete[] arr;
 				_size = other._size;
 				_capacity = other._capacity;
 				arr = other.arr;
@@ -80,6 +80,7 @@ namespace m{
 			}
 
 			inline vector& operator = (vector&& other) {
+				delete[] arr;
 				arr = other.arr;
 				_size = other._size;
 				_capacity = other._capacity;
@@ -92,6 +93,7 @@ namespace m{
 			inline vector(vector const& other) {
 				_size = other._size;
 				_capacity = other._capacity;
+				delete[] arr;
 				arr = new T[_capacity];
 				copy(arr, other.arr);
 			}
@@ -101,13 +103,16 @@ namespace m{
 			}
 
 			inline vector& operator = (vector const& other) {
-				if (this == &other || other.arr == nullptr)
+				if (this == &other)
 					return *this;
 				_size = other._size;
 				_capacity = other._capacity;
 				delete[] arr;
-				arr = new T[_capacity];
-				copy(arr, other.arr);
+				if (other._size != 0) // improvization remove func if vector<vector<int>> a;  a[0] = T();
+				{
+					arr = new T[_capacity];
+					copy(arr, other.arr);
+				}
 				return *this;
 			}
 
@@ -123,7 +128,9 @@ namespace m{
 
 			inline void remove(size_t const& pos) {
 				assert(pos >= 0 && pos < _size);
-				memmove(arr + pos - 1, arr + pos, sizeof(T) * (_size - pos));
+				arr[pos] = T();                 // very bad move but qiuck
+				if (pos != _size - 1)
+					memmove(arr + pos, arr + pos + 1, sizeof(T) * (_size - pos));
 				_size -= 1;
 			}
 

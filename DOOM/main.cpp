@@ -11,6 +11,8 @@
 #include "input.h"
 #include "timer.h"
 #include "image.h"
+#include "bullets/imp_bullet.h"
+#include "bullets/bullet.h"
 //#include "Log/log.h"
 #include "render_stuff.h"
 
@@ -36,7 +38,7 @@ LRESULT CALLBACK win_callback(HWND hwnd, UINT uMsg, WPARAM wparam, LPARAM lParam
 			running = false;
 		} break;
 
-		case WM_SIZE:  
+		case WM_SIZE:
 		{
 			RECT rect;
 			GetClientRect(hwnd, &rect);
@@ -121,6 +123,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	int gun_texture_id = 0;
 	Animation pistol_anime(3, 60000);
 
+	// player vars
+	int player_hp = 100;
+	bool get_damage = false;
+	Animation damageAnime(1, 200000);
+	Animation deathAnime(1, 200000, 1);
 
 	// map
 	const size_t map_w = 16; // map width
@@ -144,18 +151,16 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		"0001111111100000"; // our game map
 	assert(sizeof(map) == map_w * map_h + 1); // +1 for the null terminated string
 
-
 	const size_t map_cell_w = win_w / map_w / 5;
 	const size_t map_cell_h = win_h / map_h / 4;
 
 
-	// colors
+	// walls colors on map
 	const size_t ncolors = 10;
 	uint32_t* colors = new uint32_t[ncolors];
 	for (size_t i = 0; i < ncolors; i++) {
 		colors[i] = pack_color((i * 130) % 255, (i * 32)% 255, rand() % 255);
 	}
-
 
 	// load textures
 	uint32_t* walltext = NULL; // textures for the walls
@@ -195,6 +200,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 	Imp::death = imp_death;
 	Imp::sprites = imp_spr;
+	Imp::behavior = imp_behavior;
 	enemies.push_back(new Imp(100, 3, 7, 5));
 	enemies.push_back(new Imp(100, 2, 8, 0));
 	enemies.push_back(new Imp(100, 10, 9, 0));
@@ -202,7 +208,19 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	enemies.push_back(new Imp(100, 6, 14.5f, 0));
 	enemies.push_back(new Imp(100, 6, 8, 0));
 	enemies.push_back(new Imp(100, 13, 3, 0));
+	enemies.push_back(new Imp(100, 10, 6, 0));
+	enemies.push_back(new Imp(100, 9, 4, 0));
 
+	// enemy bullets
+	uint32_t* imp_bullet = NULL;
+	size_t impb_size = 0;
+	size_t impb_cnt = 0;
+	if (!load_texture("textures/imp_bullet.png", imp_bullet, impb_size, impb_cnt))
+		return -1;
+
+	Imp_bullet::sprite = imp_bullet;
+	vector<Bullet*> bullets;
+	
 
 	// input
 	Input input;
@@ -390,7 +408,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		// Collision detection
 		if ((new_player_x > 0 && new_player_x < map_cell_w * map_cell_h && new_player_y > 0 && new_player_y < map_cell_w * map_cell_w) &&
 			(map[(int)(new_player_y + 0.25f) * map_w + (int)(new_player_x + 0.25f)] != ' ' ||
-			 map[(int)(new_player_y - 0.25f) * map_w + (int)(new_player_x - 0.25f)] != ' '))
+			 map[(int)(new_player_y - 0.25f) * map_w + (int)(new_player_x - 0.25f)] != ' ' ||
+			 map[(int)(new_player_y + 0.25f) * map_w + (int)(new_player_x - 0.25f)] != ' ' ||
+			 map[(int)(new_player_y - 0.25f) * map_w + (int)(new_player_x + 0.25f)] != ' '))
 		{
 			// if wall
 			float x_dif = new_player_x - player_x;
@@ -603,6 +623,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 					surface.memory[h_offset + i + (v_offset + j) * win_w] = color;
 				}
 			}
+
+			// behavior
+			if (enemies[n]->m_hp > 0)
+				enemies[n]->behavior(enemies[n], player_x, player_y, nFrameTime, bullets);
 		}
 
 		// sort enemies
@@ -663,6 +687,105 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				enemies[i]->hit = true;
 				enemies[i]->hit_animation.add_cycle(1);
 			}
+		}
+
+		// sort bullets by distance
+		if (bullets.size() > 1)
+			m::sort(bullets.begin(), bullets.end(), [](Bullet* a, Bullet* b) { return a->distance > b->distance; });
+
+
+		// draw enemy bullets
+		for (int n = 0; n < bullets.size(); n++)
+		{
+			// BULLET HANDLER-------------------
+
+			// bullet movment
+			bullets[n]->pos_x += nFrameTime * cosf(bullets[n]->angle) * bullets[n]->speed;
+			bullets[n]->pos_y += nFrameTime * sinf(bullets[n]->angle) * bullets[n]->speed;
+
+			// if in wall
+			if (map[int(bullets[n]->pos_y) * map_w + int(bullets[n]->pos_x)] != ' ')
+			{
+				bullets.remove(n--);
+				continue;
+			}
+
+			// if player
+			if (fabs(bullets[n]->pos_y - player_y) < 0.2f && fabs(bullets[n]->pos_x - player_x) < 0.2f)
+			{
+				player_hp -= 20;
+				get_damage = true;
+				damageAnime.add_cycle(1);
+				bullets.remove(n--);
+				continue;
+			}
+
+			//-----------------------------------
+
+			// DRAW BULLET
+
+			// angle of bullet
+			float sprite_dir = atan2(bullets[n]->pos_y - player_y, bullets[n]->pos_x - player_x);
+
+			while (sprite_dir - player_a > PI) sprite_dir -= 2 * PI;
+			while (sprite_dir - player_a < -PI) sprite_dir += 2 * PI;
+
+			// distance from the player to the bullet
+			bullets[n]->distance = sqrt(pow(player_x - bullets[n]->pos_x, 2) + pow(player_y - bullets[n]->pos_y, 2));
+			size_t sprite_screen_size = min(2000, static_cast<int>(win_h / bullets[n]->distance));
+
+			int h_offset = (sprite_dir - player_a) * (win_w) / (fov)+(win_w) / 2 - sprite_screen_size / 2;
+			int v_offset = win_h / 2 - sprite_screen_size / 2;
+
+			// bullet on map
+			if (fabs(sprite_dir - player_a) < fov / 2 && bullets[n]->distance < 20 && depth_buffer[h_offset] > bullets[n]->distance)
+				draw_rectangle(&surface, bullets[n]->pos_y * map_cell_w - 2, bullets[n]->pos_x * map_cell_h - 2, 2, 2, pack_color(240, 10, 10));
+
+			for (size_t i = 0; i < sprite_screen_size; i++)
+			{
+				if (h_offset + int(i) < 0 || h_offset + i >= win_w) continue;
+
+				if (depth_buffer[h_offset + int(i)] > bullets[n]->distance)
+				{
+					depth_buffer[h_offset + int(i)] = bullets[n]->distance;
+				}
+				else continue;
+
+				for (size_t j = 1; j < sprite_screen_size; j++)
+				{
+					if (v_offset + int(j) < 0 || v_offset + j >= win_h) continue;
+
+					uint32_t color = Imp_bullet::sprite[(int)(i * (float)impb_size / sprite_screen_size) + (int)((sprite_screen_size - j) * (float)impb_size / sprite_screen_size) * impb_cnt * impb_size];
+
+
+					// filter the background
+					uint8_t a, r, g, b;
+					unpack_color(color, r, g, b, a);
+					if (r == 255 && b == 0 && g == 110) continue;
+					surface.memory[h_offset + i + (v_offset + j) * win_w] = color;
+				}
+			}
+		}
+
+		// damage animation
+		if (damageAnime.cycles > 0)
+		{
+			damageAnime.sprite(nFrameTime);
+
+			for (int i = 0; i < win_w * win_h; i++)
+				surface.memory[i] |= 80 << 16; // red screen
+		}
+
+		// death animation
+		if (player_hp < 1)
+		{
+			deathAnime.sprite(nFrameTime);
+
+			if (deathAnime.cycles == 0)
+				return 0;
+
+			for (int i = 0; i < win_w * win_h; i++)
+				surface.memory[i] |= 255 << 16; // red screen
 		}
 
 		// Render

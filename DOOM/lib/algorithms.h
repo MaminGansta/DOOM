@@ -87,6 +87,8 @@ namespace m{
 
 	template <typename T, typename F>
 	inline void sort(T* left, T* right, F comp) {
+		if (left == right || left == NULL || right == NULL)
+			return;
 
 		T* i = left, * j = right;
 		T tmp;
