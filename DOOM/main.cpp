@@ -121,7 +121,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 	// gun
 	int gun_texture_id = 0;
-	Animation pistol_anime(3, 60000);
+	Animation pistol_anime(3, 80000);
 
 	// player vars
 	int player_hp = 100;
@@ -209,7 +209,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	enemies.push_back(new Imp(100, 6, 8, 0));
 	enemies.push_back(new Imp(100, 13, 3, 0));
 	enemies.push_back(new Imp(100, 10, 6, 0));
-	enemies.push_back(new Imp(100, 9, 4, 0));
+	enemies.push_back(new Imp(100, 8, 4, 0));
 
 	// enemy bullets
 	uint32_t* imp_bullet = NULL;
@@ -270,7 +270,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				}break;
 				case VK_W:
 				{
-					input.buttons[BUTTON_UP].changed = true;// input.buttons[BUTTON_UP].is_down != is_down;
+					input.buttons[BUTTON_UP].changed = is_down;// input.buttons[BUTTON_UP].is_down != is_down;
 					input.buttons[BUTTON_UP].is_down = is_down;
 
 				}break;
@@ -294,7 +294,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				}break;
 				case VK_SPACE:
 				{
-					input.buttons[BUTTON_SHOT].changed = true;// input.buttons[BUTTON_SHOT].is_down != is_down;
+					input.buttons[BUTTON_SHOT].changed = is_down != input.buttons[BUTTON_SHOT].is_down;// input.buttons[BUTTON_SHOT].is_down != is_down;
 					input.buttons[BUTTON_SHOT].is_down = is_down;
 
 				}break;
@@ -794,9 +794,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 		// Log
 		//add_log(std::to_string(nFPS));
-		/*char fps[10];
+		char fps[10];
 		sprintf_s(fps, "%d\n", nFPS, 10);
-		DBOUT(fps);*/
+		DBOUT(fps);
 
 		// Timer
 		timer_update();

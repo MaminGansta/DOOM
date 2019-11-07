@@ -127,8 +127,8 @@ namespace m{
 			}
 
 			inline void remove(size_t const& pos) {
-				assert(pos >= 0 && pos < _size);
-				arr[pos] = T();                 // very bad move but qiuck
+ 				assert(pos >= 0 && pos < _size);
+				arr[pos].~T();
 				if (pos != _size - 1)
 					memmove(arr + pos, arr + pos + 1, sizeof(T) * (_size - pos));
 				_size -= 1;
