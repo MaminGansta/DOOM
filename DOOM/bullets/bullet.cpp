@@ -1,6 +1,3 @@
-#pragma once
-#include <cstdint>
-
 struct Bullet 
 {
 	float pos_x;

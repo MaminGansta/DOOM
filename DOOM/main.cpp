@@ -1,29 +1,39 @@
 #include <windows.h>
+
 #include <cstdint>
 #include <cassert>
+#include <string>
+#include <chrono>
+#include <thread>
+#include <vector>
+#include <algorithm>
 
-#include "lib/vector.h"
-#include "lib/algorithms.h"
-
-#include "animation/animation.h"
-#include "enemies/enemy.h"
-#include "enemies/imp.h"
-#include "input.h"
-#include "timer.h"
-#include "image.h"
-#include "bullets/imp_bullet.h"
-#include "bullets/bullet.h"
-//#include "Log/log.h"
-#include "render_stuff.h"
-
-#define DBOUT(s)  OutputDebugString(s)
-
-using namespace m::vector;
-using namespace m::Timer;
 #define PI 3.14159265359f
 
-bool running = true;
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+#include "render_stuff.cpp"
 Render_State surface;
+
+#include "image.cpp"
+#include "input.cpp"
+#include "timer.cpp"
+
+
+#include "animation/animation.cpp"
+
+#include "bullets/bullet.cpp"
+#include "bullets/imp_bullet.cpp"
+
+#include "enemies/enemy.cpp"
+#include "enemies/imp.cpp"
+
+
+
+
+bool running = true;
 
 
 LRESULT CALLBACK win_callback(HWND hwnd, UINT uMsg, WPARAM wparam, LPARAM lParam)
@@ -72,14 +82,14 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	// create window class
 	WNDCLASS window_class = {};
 	window_class.style = CS_HREDRAW | CS_VREDRAW;
-	window_class.lpszClassName = "Game";
+	window_class.lpszClassName = "DOOM";
 	window_class.lpfnWndProc = win_callback;
 
 	// reg window
 	RegisterClass(&window_class);
 
 	// create window
-	HWND window = CreateWindow(window_class.lpszClassName, "Game!!!", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, 800, 620, 0, 0, hInst, 0);
+	HWND window = CreateWindow(window_class.lpszClassName, "DOOM", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, 800, 620, 0, 0, hInst, 0);
 	HDC hdc = GetDC(window);
 
 	// GAME VARS------------------------------
@@ -98,17 +108,15 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 
 	// speed
-	float speed_limit = 0.0000045f;
-	float speed_change = 0.000000000015f;
+	float speed_limit = 5;
+	float speed_change = 28;
 
 	// speed x
-	float speed_angle_x = 0.0f;
 	float speed_x = 0.0f;
 	bool moving_x = false;
 	int speed_x_dir = 1;
 
 	// speed y
-	float speed_angle_y = 0.0f;
 	float speed_y = 0.0f;
 	bool moving_y = false;
 	int speed_y_dir = 1;
@@ -121,13 +129,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 	// gun
 	int gun_texture_id = 0;
-	Animation pistol_anime(3, 80000);
+	Animation pistol_anime(3, 0.07f);
 
 	// player vars
 	int player_hp = 100;
 	bool get_damage = false;
-	Animation damageAnime(1, 200000);
-	Animation deathAnime(1, 200000, 1);
+	Animation damageAnime(1, 0.15f);
+	Animation deathAnime(1, 0.4f, 1);
 
 	// map
 	const size_t map_w = 16; // map width
@@ -162,7 +170,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		colors[i] = pack_color((i * 130) % 255, (i * 32)% 255, rand() % 255);
 	}
 
-	// load textures
+	// load textures 
+	// walls
 	uint32_t* walltext = NULL; // textures for the walls
 	size_t walltext_size;  // texture dimensions (it is a square)
 	size_t walltext_cnt;   // number of different textures in the image
@@ -184,7 +193,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		return -1;
 
 	// create enemies
-	vector<Enemy*> enemies;
+	std::vector<Enemy*> enemies;
 
 	uint32_t* imp_spr = NULL;
 	size_t imp_size = 0;
@@ -211,7 +220,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	enemies.push_back(new Imp(100, 10, 6, 0));
 	enemies.push_back(new Imp(100, 8, 4, 0));
 
-	// enemy bullets
+	// enemyes bullets
 	uint32_t* imp_bullet = NULL;
 	size_t impb_size = 0;
 	size_t impb_cnt = 0;
@@ -219,7 +228,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		return -1;
 
 	Imp_bullet::sprite = imp_bullet;
-	vector<Bullet*> bullets;
+	std::vector<Bullet*> bullets;
 	
 
 	// input
@@ -228,7 +237,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	bool DEBUG = false;
 
 	// GAME LOOP---------------------------------
-	timer_init();
+	Timer timer;
 	while (running)
 	{
 		// clear the depth_buffer
@@ -321,21 +330,18 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			DEBUG = false;
 
 		// if shooting
-
 		if (input.buttons[BUTTON_SHOT].is_down & input.buttons[BUTTON_SHOT].changed)
 			shot = true;
 
 		// Movement
 		if (input.buttons[BUTTON_RROTATE].is_down)
-			player_a += 0.0000025f * nFrameTime;
+			player_a += 2.2f * timer.elapsed;
 
 		if (input.buttons[BUTTON_LROTATE].is_down)
-			player_a -= 0.0000025f * nFrameTime;
+			player_a -= 2.2f * timer.elapsed;
 
-		//player_a = fmod(player_a, 2 * PI);
 		while (player_a > 2*PI) player_a -= 2 * PI;
 		while (player_a < 0) player_a += 2 * PI;
-
 
 
 		if (input.buttons[BUTTON_UP].is_down)
@@ -369,40 +375,40 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		if (moving_x)
 		{
 			if (speed_x_dir > 0)
-				speed_x = speed_x > speed_limit ? speed_limit : speed_x + speed_change * nFrameTime;
+				speed_x = speed_x > speed_limit ? speed_limit : speed_x + speed_change * timer.elapsed;
 			else
-				speed_x = speed_x < (-1) * speed_limit ? (-1) * speed_limit : speed_x - speed_change * nFrameTime;
+				speed_x = speed_x < (-1) * speed_limit ? (-1) * speed_limit : speed_x - speed_change * timer.elapsed;
 		}
 		else
 		{
 			if (speed_x > 0)
-				speed_x = speed_x < 0.0000001f ? 0.0f : speed_x - speed_change * nFrameTime;
+				speed_x = speed_x < 1 ? 0.0f : speed_x - speed_change * timer.elapsed;
 			else
-				speed_x = speed_x > -0.0000001f ? 0.0f : speed_x + speed_change * nFrameTime;
+				speed_x = speed_x > -1 ? 0.0f : speed_x + speed_change * timer.elapsed;
 		}
 
 		if (moving_y)
 		{
 			if (speed_y_dir > 0)
-				speed_y = speed_y > speed_limit ? speed_limit : speed_y + speed_change * nFrameTime;
+				speed_y = speed_y > speed_limit ? speed_limit : speed_y + speed_change * timer.elapsed;
 			else
-				speed_y = speed_y < (-1) * speed_limit ? (-1) * speed_limit : speed_y - speed_change * nFrameTime;
+				speed_y = speed_y < (-1) * speed_limit ? (-1) * speed_limit : speed_y - speed_change * timer.elapsed;
 		}
 		else
 		{
 			if (speed_y > 0)
-				speed_y = speed_y < 0.0000001f ? 0.0f : speed_y - speed_change * nFrameTime;
+				speed_y = speed_y < 1 ? 0.0f : speed_y - speed_change * timer.elapsed;
 			else
-				speed_y = speed_y > -0.0000001f ? 0.0f : speed_y + speed_change * nFrameTime;
+				speed_y = speed_y > -1 ? 0.0f : speed_y + speed_change * timer.elapsed;
 		}
 
 		// x direction
-		new_player_x += nFrameTime * cosf(player_a)  * speed_x;
-		new_player_y += nFrameTime * sinf(player_a)  * speed_x;
+		new_player_x += timer.elapsed * cosf(player_a)  * speed_x;
+		new_player_y += timer.elapsed * sinf(player_a)  * speed_x;
 
 		// y direction
-		new_player_x += nFrameTime * cosf(player_a + PI / 2) * speed_y;
-		new_player_y += nFrameTime * sinf(player_a + PI / 2) * speed_y;
+		new_player_x += timer.elapsed * cosf(player_a + PI / 2) * speed_y;
+		new_player_y += timer.elapsed * sinf(player_a + PI / 2) * speed_y;
 
 		
 		// Collision detection
@@ -568,13 +574,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			if (enemies[n]->hit && enemies[n]->m_hp > 0)
 			{
 				if (enemies[n]->hit_animation.cycles)
-					text_id = enemies[n]->hit_animation.sprite(nFrameTime);
+					text_id = enemies[n]->hit_animation.sprite(timer.elapsed);
 				else
 					enemies[n]->hit = false;
 			}
 			else if (enemies[n]->m_hp <= 0)
 			{
-				int frame = enemies[n]->death_animation.sprite(nFrameTime);
+				int frame = enemies[n]->death_animation.sprite(timer.elapsed);
 				frame = frame || enemies[n]->death_animation.cycles != 0 ? frame + 8 : frame + 12;
 				text_id = frame;
 			}
@@ -627,11 +633,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 			// behavior
 			if (enemies[n]->m_hp > 0)
-				enemies[n]->behavior(enemies[n], player_x, player_y, nFrameTime, bullets);
+				enemies[n]->behavior(enemies[n], player_x, player_y, timer.elapsed, bullets);
 		}
 
 		// sort enemies
-		m::sort(enemies.begin(), enemies.end(), [](Enemy* a, Enemy* b) { return a->m_distance > b->m_distance; });
+		std::sort(enemies.begin(), enemies.end(), [](Enemy* a, Enemy* b) { return a->m_distance > b->m_distance; });
 
 
 
@@ -639,7 +645,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		if (shot)
 			pistol_anime.add_cycle(1);
 		
-		gun_texture_id = pistol_anime.sprite(nFrameTime);
+		gun_texture_id = pistol_anime.sprite(timer.elapsed);
 
 		// draw gun
 		if (gun_shift < 0)
@@ -648,7 +654,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			gun_shift_dir = -1;
 		if (player_step > 1e-2)
 		{
-			gun_shift += gun_shift_dir * (float)nFrameTime / 40000;
+			gun_shift += gun_shift_dir * timer.elapsed * 30;
 		}
 
 		int gun_h = int(win_h / 2.3f);
@@ -672,27 +678,29 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		}
 
 		// shot handler
-		for (int i = 0; i < enemies.size(); i++)
+		if (shot)
 		{
-			// repeating but more readable
-			// absolute direction from the player to the sprite (in radians)
-			float sprite_dir = atan2(enemies[i]->m_pos_y - player_y, enemies[i]->m_pos_x - player_x);
-
-			// remove unnecessary periods from the relative direction
-			while (sprite_dir - player_a > PI) sprite_dir -= 2 * PI;
-			while (sprite_dir - player_a < -PI) sprite_dir += 2 * PI;
-
-			if (fabs(fabs(player_a) - fabs(sprite_dir - 0.07f)) < 0.07f && shot && enemies[i]->visible)
+			for (int i = 0; i < enemies.size(); i++)
 			{
-				enemies[i]->m_hp -= 50;
-				enemies[i]->hit = true;
-				enemies[i]->hit_animation.add_cycle(1);
+				// absolute direction from the player to the sprite (in radians)
+				float sprite_dir = atan2(enemies[i]->m_pos_y - player_y, enemies[i]->m_pos_x - player_x);
+
+				// remove unnecessary periods from the relative direction
+				while (sprite_dir - player_a > PI) sprite_dir -= 2 * PI;
+				while (sprite_dir - player_a < -PI) sprite_dir += 2 * PI;
+
+				if (fabs(fabs(player_a) - fabs(sprite_dir - 0.07f)) < 0.07f && enemies[i]->visible)
+				{
+					enemies[i]->m_hp -= 50;
+					enemies[i]->hit = true;
+					enemies[i]->hit_animation.add_cycle(1);
+				}
 			}
 		}
 
-		// sort bullets by distance
+		// sort enemyes bullets by distance
 		if (bullets.size() > 1)
-			m::sort(bullets.begin(), bullets.end(), [](Bullet* a, Bullet* b) { return a->distance > b->distance; });
+			std::sort(bullets.begin(), bullets.end(), [](Bullet* a, Bullet* b) { return a->distance > b->distance; });
 
 
 		// draw enemy bullets
@@ -701,13 +709,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			// BULLET HANDLER-------------------
 
 			// bullet movment
-			bullets[n]->pos_x += nFrameTime * cosf(bullets[n]->angle) * bullets[n]->speed;
-			bullets[n]->pos_y += nFrameTime * sinf(bullets[n]->angle) * bullets[n]->speed;
+			bullets[n]->pos_x += timer.elapsed * cosf(bullets[n]->angle) * bullets[n]->speed;
+			bullets[n]->pos_y += timer.elapsed * sinf(bullets[n]->angle) * bullets[n]->speed;
 
 			// if in wall
 			if (map[int(bullets[n]->pos_y) * map_w + int(bullets[n]->pos_x)] != ' ')
 			{
-				bullets.remove(n--);
+				bullets.erase(bullets.begin() + n--);
 				continue;
 			}
 
@@ -717,7 +725,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				player_hp -= 20;
 				get_damage = true;
 				damageAnime.add_cycle(1);
-				bullets.remove(n--);
+				bullets.erase(bullets.begin() + n--);
 				continue;
 			}
 
@@ -756,8 +764,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				{
 					if (v_offset + int(j) < 0 || v_offset + j >= win_h) continue;
 
+					// take a pixel of texture (relative by screen size)
 					uint32_t color = Imp_bullet::sprite[(int)(i * (float)impb_size / sprite_screen_size) + (int)((sprite_screen_size - j) * (float)impb_size / sprite_screen_size) * impb_cnt * impb_size];
-
 
 					// filter the background
 					uint8_t a, r, g, b;
@@ -771,7 +779,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		// damage animation
 		if (damageAnime.cycles > 0)
 		{
-			damageAnime.sprite(nFrameTime);
+			damageAnime.sprite(timer.elapsed);
 
 			for (int i = 0; i < win_w * win_h; i++)
 				surface.memory[i] |= 80 << 16; // red screen
@@ -780,26 +788,25 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		// death animation
 		if (player_hp < 1)
 		{
-			deathAnime.sprite(nFrameTime);
+			deathAnime.sprite(timer.elapsed);
 
 			if (deathAnime.cycles == 0)
 				return 0;
 
 			for (int i = 0; i < win_w * win_h; i++)
-				surface.memory[i] |= 255 << 16; // red screen
+				surface.memory[i] = 255 << 16; // red screen
 		}
 
 		// Render
 		StretchDIBits(hdc, 0, 0, surface.width, surface.height, 0, 0, surface.width, surface.height, surface.memory, &surface.bitmap_info, DIB_RGB_COLORS, SRCCOPY);
 
 		// Log
-		//add_log(std::to_string(nFPS));
-		char fps[10];
-		sprintf_s(fps, "%d\n", nFPS, 10);
-		DBOUT(fps);
+		char info[32];
+		sprintf_s(info, "fps_%d  frame time_%.4f sec\n", timer.FPS, timer.elapsed);
+		OutputDebugString(info);
 
 		// Timer
-		timer_update();
+		timer.update();
 
 	}
 		

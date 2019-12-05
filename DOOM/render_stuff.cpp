@@ -1,6 +1,3 @@
-#pragma once
-#include <cstdint>
-#include <cassert>
 
 #define win_h surface.height
 #define win_w surface.width
