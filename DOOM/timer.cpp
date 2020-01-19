@@ -17,7 +17,7 @@ struct Timer
 
 	float elapsed{0};
 
-
+ 
 	inline Timer(bool frame_lock = false): m_frameLock(frame_lock)
 	{
 		privius = high_resolution_clock::now();

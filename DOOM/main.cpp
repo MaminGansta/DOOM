@@ -8,7 +8,11 @@
 #include <vector>
 #include <algorithm>
 
+// some globals
 #define PI 3.14159265359f
+#define MAX_BULLETS 20
+#define MAX_ENEMIES 10
+bool running = true;
 
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -18,22 +22,14 @@
 Render_State surface;
 
 #include "image.cpp"
-#include "input.cpp"
 #include "timer.cpp"
-
+#include "input.cpp"
+#include "thread_pool.cpp"
 
 #include "animation/animation.cpp"
 
 #include "bullets/bullet.cpp"
-#include "bullets/imp_bullet.cpp"
-
 #include "enemies/enemy.cpp"
-#include "enemies/imp.cpp"
-
-
-
-
-bool running = true;
 
 
 LRESULT CALLBACK win_callback(HWND hwnd, UINT uMsg, WPARAM wparam, LPARAM lParam)
@@ -58,7 +54,7 @@ LRESULT CALLBACK win_callback(HWND hwnd, UINT uMsg, WPARAM wparam, LPARAM lParam
 			int size = surface.width * surface.height * sizeof(unsigned int);
 
 			if (surface.memory) VirtualFree(surface.memory, 0 , MEM_RELEASE);
-			surface.memory = (uint32_t*)VirtualAlloc(0, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+			surface.memory = (Color*)VirtualAlloc(0, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
 			surface.bitmap_info.bmiHeader.biSize = sizeof(surface.bitmap_info.bmiHeader);
 			surface.bitmap_info.bmiHeader.biWidth = surface.width;
@@ -93,7 +89,12 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	HDC hdc = GetDC(window);
 
 	// GAME VARS------------------------------
-	uint32_t* column = new uint32_t[2048];
+	Color* column1 = new Color[2048];
+	Color* column2 = new Color[2048];
+	Color* column3 = new Color[2048];
+	Color* column4 = new Color[2048]; // for each thread
+
+
 	float* depth_buffer = new float[1980];
 
 	// player position
@@ -159,77 +160,61 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		"0001111111100000"; // our game map
 	assert(sizeof(map) == map_w * map_h + 1); // +1 for the null terminated string
 
-	const size_t map_cell_w = win_w / map_w / 5;
-	const size_t map_cell_h = win_h / map_h / 4;
 
+	const size_t map_cell_w = surface.width / map_w / 5;
+	const size_t map_cell_h = surface.height / map_h / 4;
 
 	// walls colors on map
-	const size_t ncolors = 10;
-	uint32_t* colors = new uint32_t[ncolors];
-	for (size_t i = 0; i < ncolors; i++) {
-		colors[i] = pack_color((i * 130) % 255, (i * 32)% 255, rand() % 255);
-	}
+	Color* map_colors = new Color[10];
+	for (size_t i = 0; i < 10; i++)
+		map_colors[i] = Color((i * 130) % 255, (i * 32) % 255, rand() % 255);
+
 
 	// load textures 
 	// walls
-	uint32_t* walltext = NULL; // textures for the walls
-	size_t walltext_size;  // texture dimensions (it is a square)
-	size_t walltext_cnt;   // number of different textures in the image
-	if (!load_texture("textures/walls2.png", walltext, walltext_size, walltext_cnt))
-		return -1;
+	Sprites walltext("textures/walls2.png");
+	if (walltext.invalid) return 1;
 
 	// load background
-	uint32_t* sky = NULL; // textures for the walls
-	size_t sky_size = 0;  // texture dimensions (it is a square)
-	size_t sky_cnt = 0;   // number of different textures in the image
-	if (!load_texture("textures/sky1.png", sky, sky_size, sky_cnt))
-		return -1;
+	Sprites sky("textures/sky1.png");
+	if (sky.invalid) return 1;
 
-	// load gun
-	uint32_t* pistol = NULL;
-	size_t pistol_size = 0;
-	size_t pistol_cnt = 0;
-	if (!load_texture("textures/pistol.png", pistol, pistol_size, pistol_cnt))
-		return -1;
+	// load gun sprites
+	Sprites gun("textures/pistol.png");
+	if (gun.invalid) return 1;
+
+	// imp sprite
+	Sprites imp_live("textures/imp_movement.png");
+	if (imp_live.invalid) return 1;
+	Sprites imp_death("textures/imp_hit_death.png");
+	if (imp_death.invalid) return 1;
+
 
 	// create enemies
-	std::vector<Enemy*> enemies;
+	enemy_sprites[ENEMY_IMP].live_sprites = std::move(imp_live);
+	enemy_sprites[ENEMY_IMP].death_sprites = std::move(imp_death);
 
-	uint32_t* imp_spr = NULL;
-	size_t imp_size = 0;
-	size_t imp_cnt = 0;
-	if (!load_texture("textures/imp_movement.png", imp_spr, imp_size, imp_cnt))
-		return -1;
+	Enemy_buffer<MAX_ENEMIES> enemies;
+	enemies.add(100, 3, 7);
+	enemies.add(100, 2, 8);
+	enemies.add(100, 10, 9);
+	enemies.add(100, 14, 11);
+	enemies.add(100, 6, 14.5f);
+	enemies.add(100, 6, 8);
+	enemies.add(100, 13, 3);
+	enemies.add(100, 10, 6);
+	enemies.add(100, 8, 4);
 
-	uint32_t* imp_death = NULL;
-	size_t impd_size = 0;
-	size_t impd_cnt = 0;
-	if (!load_texture("textures/imp_hit_death.png", imp_death, impd_size, impd_cnt))
-		return -1;
-
-	Imp::death = imp_death;
-	Imp::sprites = imp_spr;
-	Imp::behavior = imp_behavior;
-	enemies.push_back(new Imp(100, 3, 7, 5));
-	enemies.push_back(new Imp(100, 2, 8, 0));
-	enemies.push_back(new Imp(100, 10, 9, 0));
-	enemies.push_back(new Imp(100, 14, 11, 0));
-	enemies.push_back(new Imp(100, 6, 14.5f, 0));
-	enemies.push_back(new Imp(100, 6, 8, 0));
-	enemies.push_back(new Imp(100, 13, 3, 0));
-	enemies.push_back(new Imp(100, 10, 6, 0));
-	enemies.push_back(new Imp(100, 8, 4, 0));
 
 	// enemyes bullets
-	uint32_t* imp_bullet = NULL;
-	size_t impb_size = 0;
-	size_t impb_cnt = 0;
-	if (!load_texture("textures/imp_bullet.png", imp_bullet, impb_size, impb_cnt))
-		return -1;
+	Sprites bullet("textures/imp_bullet.png");
+	if (bullet.invalid) return 1;
 
-	Imp_bullet::sprite = imp_bullet;
-	std::vector<Bullet*> bullets;
+	bullet_spites[IMP_BULLET] = std::move(bullet);
+	Bullet_buffer<MAX_BULLETS> bullets;
 	
+	// thread pool
+	thread_pool workers(4);
 
 	// input
 	Input input;
@@ -267,49 +252,46 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				{
 				case VK_LEFT:
 				{
-					input.buttons[BUTTON_LROTATE].changed = true;// input.buttons[BUTTON_LROTATE].is_down != is_down;
+					input.buttons[BUTTON_LROTATE].changed = true;
 					input.buttons[BUTTON_LROTATE].is_down = is_down;
-
 				}break;
 				case VK_RIGHT:
 				{
-					input.buttons[BUTTON_RROTATE].changed = true;// input.buttons[BUTTON_RROTATE].is_down != is_down;
+					input.buttons[BUTTON_RROTATE].changed = true;
 					input.buttons[BUTTON_RROTATE].is_down = is_down;
-
 				}break;
 				case VK_W:
 				{
-					input.buttons[BUTTON_UP].changed = is_down;// input.buttons[BUTTON_UP].is_down != is_down;
+					input.buttons[BUTTON_UP].changed = is_down;
 					input.buttons[BUTTON_UP].is_down = is_down;
-
 				}break;
 				case VK_S:
 				{
-					input.buttons[BUTTON_DOWN].changed = true;// input.buttons[BUTTON_DOWN].is_down != is_down;
+					input.buttons[BUTTON_DOWN].changed = true;
 					input.buttons[BUTTON_DOWN].is_down = is_down;
-
 				}break;
 				case VK_A:
 				{
-					input.buttons[BUTTON_LEFT].changed = true;// input.buttons[BUTTON_LEFT].is_down != is_down;
+					input.buttons[BUTTON_LEFT].changed = true;
 					input.buttons[BUTTON_LEFT].is_down = is_down;
-
 				}break;
 				case VK_D:
 				{
-					input.buttons[BUTTON_RIGHT].changed = true;// input.buttons[BUTTON_RIGHT].is_down != is_down;
+					input.buttons[BUTTON_RIGHT].changed = true;
 					input.buttons[BUTTON_RIGHT].is_down = is_down;
-
 				}break;
 				case VK_SPACE:
 				{
-					input.buttons[BUTTON_SHOT].changed = is_down != input.buttons[BUTTON_SHOT].is_down;// input.buttons[BUTTON_SHOT].is_down != is_down;
+					input.buttons[BUTTON_SHOT].changed = is_down != input.buttons[BUTTON_SHOT].is_down;
 					input.buttons[BUTTON_SHOT].is_down = is_down;
-
 				}break;
 				case VK_DEBUG:
 				{
 					DEBUG = true;
+				}break;
+				case VK_ESCAPE:
+				{
+					running = false;
 				}break;
 			}
 			}break;
@@ -453,73 +435,238 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			player_x = new_player_x;
 		}
 
-		// Simulate
+
+		// draw the background
+		// floor
+		auto _floor = workers.add_task([]() {
+			draw_rectangle(0, 0, surface.width, surface.height / 2, Color(130, 130, 130));
+		});
+		// sky
+		auto _skys = workers.add_task([&sky]() {
+			for (int y = surface.height / 2; y < surface.height; y++)
+			{
+				for (int x = 0; x < surface.width; x++)
+				{
+					Color color = sky.data[(int)(y * ((float)sky.width / surface.height / 2)) * sky.width + (int)(x * ((float)sky.width / surface.width))];
+					surface.memory[y * surface.width + x] = color;
+				}
+			}
+		});
+		
+		// wait 
+		_floor.get();
+		_skys.get();
+
+
+		// Walls ---------------------------------------------------------------------------------
 		const float fov = PI / 3.0f; // field of view
 
 		// ray caster
-		for (int i = 0; i < win_w ; i++)
-		{
-			float angle = player_a - fov / 2 + fov * i / float(surface.width);
-
-			// draw the background
-			if (i == 0)
+		auto wall1 = workers.add_task([&]() {
+			for (int i = 0; i < surface.width / 4; i++)
 			{
-				 draw_rectangle(&surface, 0,  0,         win_w, win_h / 2, pack_color(130, 130, 130));
+				float angle = player_a - fov / 2 + fov * i / float(surface.width);
 
-				// sky
-				for (int y = win_h / 2; y < win_h; y++)
+
+				// ray casting
+				for (float t = 0.0f; t < 20; t += 0.025f)
 				{
-					for (int x = 0; x < win_w; x++)
-					{
-						uint32_t color = sky[(int)(y * ((float)sky_size / win_h / 2)) * sky_size + (int)(x * ((float)sky_size / win_w))];
+					float cx = player_x + t * cos(angle);
+					float cy = player_y + t * sin(angle);
 
-						surface.memory[y * win_w + x] = color;
+					// ray on map
+					size_t pix_x = cy * map_cell_w;
+					size_t pix_y = cx * map_cell_h;
+					surface.memory[pix_x + pix_y * surface.width] = Color(240, 240, 240);
+
+					// walls
+					if (map[int(cx) + int(cy) * map_w] != ' ')
+					{
+						size_t column_height = min(2048, (surface.height / t / cos(angle - player_a)));
+						int texid = (int)map[int(cx) + int(cy) * map_w] - 48;
+
+						float hitx = cx - floor(cx + 0.5f);
+						float hity = cy - floor(cy + 0.5f);
+						int x_texcoord = hitx * walltext.width;
+						if (std::abs(hity) > std::abs(hitx))
+						{
+							x_texcoord = hity * walltext.width;
+						}
+						if (x_texcoord < 0) x_texcoord += walltext.width;
+						assert(x_texcoord >= 0 && x_texcoord < (int)walltext.width);
+
+
+						texture_column(column1, walltext, texid, x_texcoord, column_height);
+						pix_x = i;
+						for (size_t j = 0; j < column_height; j++) {
+							pix_y = j + surface.height / 2 - column_height / 2;
+							if (pix_y < 0 || pix_y >= surface.height) continue;
+							surface.memory[pix_x + pix_y * surface.width] = column1[j];
+							// depth_buffer
+							depth_buffer[pix_x] = t;
+						}
+						break;
 					}
 				}
-
 			}
+		});
 
-			// ray casting
-			for (float t = 0.0f; t < 20; t += 0.025f)
+		// ray caster
+		auto wall2 = workers.add_task([&]() {
+			for (int i = surface.width / 4; i < surface.width / 2; i++)
 			{
-				float cx = player_x + t * cos(angle);
-				float cy = player_y + t * sin(angle);
+				float angle = player_a - fov / 2 + fov * i / float(surface.width);
 
-				// ray on map
-				size_t pix_x = cy * map_cell_w;
-				size_t pix_y = cx * map_cell_h;
-				surface.memory[pix_x + pix_y * surface.width] = pack_color(240, 240, 240);
 
-				// walls
-				if (map[int(cx) + int(cy) * map_w] != ' ')
+				// ray casting
+				for (float t = 0.0f; t < 20; t += 0.025f)
 				{
-					size_t column_height = min(2048, (win_h / t / cos(angle - player_a)));
-					int texid = (int)map[int(cx) + int(cy) * map_w] - 48;
+					float cx = player_x + t * cos(angle);
+					float cy = player_y + t * sin(angle);
 
-					float hitx = cx - floor(cx + 0.5f);
-					float hity = cy - floor(cy + 0.5f);
-					int x_texcoord = hitx * walltext_size;
-					if (std::abs(hity) > std::abs(hitx))
+					// ray on map
+					size_t pix_x = cy * map_cell_w;
+					size_t pix_y = cx * map_cell_h;
+					surface.memory[pix_x + pix_y * surface.width] = Color(240, 240, 240);
+
+					// walls
+					if (map[int(cx) + int(cy) * map_w] != ' ')
 					{
-						x_texcoord = hity * walltext_size;
-					}
-					if (x_texcoord < 0) x_texcoord += walltext_size;
-					assert(x_texcoord >= 0 && x_texcoord < (int)walltext_size);
+						size_t column_height = min(2048, (surface.height / t / cos(angle - player_a)));
+						int texid = (int)map[int(cx) + int(cy) * map_w] - 48;
+
+						float hitx = cx - floor(cx + 0.5f);
+						float hity = cy - floor(cy + 0.5f);
+						int x_texcoord = hitx * walltext.width;
+						if (std::abs(hity) > std::abs(hitx))
+						{
+							x_texcoord = hity * walltext.width;
+						}
+						if (x_texcoord < 0) x_texcoord += walltext.width;
+						assert(x_texcoord >= 0 && x_texcoord < (int)walltext.width);
 
 
-					texture_column(column, walltext, walltext_size, walltext_cnt, texid, x_texcoord, column_height);
-					pix_x = i;
-					for (size_t j = 0; j < column_height; j++) {
-						pix_y = j + win_h / 2 - column_height / 2;
-						if (pix_y < 0 || pix_y >= win_h) continue;
-						surface.memory[pix_x + pix_y * win_w] = column[j];
-						// depth_buffer
-						depth_buffer[pix_x] = t;
+						texture_column(column2, walltext, texid, x_texcoord, column_height);
+						pix_x = i;
+						for (size_t j = 0; j < column_height; j++) {
+							pix_y = j + surface.height / 2 - column_height / 2;
+							if (pix_y < 0 || pix_y >= surface.height) continue;
+							surface.memory[pix_x + pix_y * surface.width] = column2[j];
+							// depth_buffer
+							depth_buffer[pix_x] = t;
+						}
+						break;
 					}
-					break;
 				}
 			}
-		}
+		});
+
+		auto wall3 = workers.add_task([&]() {
+			for (int i = surface.width / 2; i < 3 * surface.width / 4; i++)
+			{
+				float angle = player_a - fov / 2 + fov * i / float(surface.width);
+
+
+				// ray casting
+				for (float t = 0.0f; t < 20; t += 0.025f)
+				{
+					float cx = player_x + t * cos(angle);
+					float cy = player_y + t * sin(angle);
+
+					// ray on map
+					size_t pix_x = cy * map_cell_w;
+					size_t pix_y = cx * map_cell_h;
+					surface.memory[pix_x + pix_y * surface.width] = Color(240, 240, 240);
+
+					// walls
+					if (map[int(cx) + int(cy) * map_w] != ' ')
+					{
+						size_t column_height = min(2048, (surface.height / t / cos(angle - player_a)));
+						int texid = (int)map[int(cx) + int(cy) * map_w] - 48;
+
+						float hitx = cx - floor(cx + 0.5f);
+						float hity = cy - floor(cy + 0.5f);
+						int x_texcoord = hitx * walltext.width;
+						if (std::abs(hity) > std::abs(hitx))
+						{
+							x_texcoord = hity * walltext.width;
+						}
+						if (x_texcoord < 0) x_texcoord += walltext.width;
+						assert(x_texcoord >= 0 && x_texcoord < (int)walltext.width);
+
+
+						texture_column(column3, walltext, texid, x_texcoord, column_height);
+						pix_x = i;
+						for (size_t j = 0; j < column_height; j++) {
+							pix_y = j + surface.height / 2 - column_height / 2;
+							if (pix_y < 0 || pix_y >= surface.height) continue;
+							surface.memory[pix_x + pix_y * surface.width] = column3[j];
+							// depth_buffer
+							depth_buffer[pix_x] = t;
+						}
+						break;
+					}
+				}
+			}
+		});
+
+		// ray caster
+		auto wall4 = workers.add_task([&]() {
+			for (int i = 3 * surface.width / 4; i < surface.width; i++)
+			{
+				float angle = player_a - fov / 2 + fov * i / float(surface.width);
+
+
+				// ray casting
+				for (float t = 0.0f; t < 20; t += 0.025f)
+				{
+					float cx = player_x + t * cos(angle);
+					float cy = player_y + t * sin(angle);
+
+					// ray on map
+					size_t pix_x = cy * map_cell_w;
+					size_t pix_y = cx * map_cell_h;
+					surface.memory[pix_x + pix_y * surface.width] = Color(240, 240, 240);
+
+					// walls
+					if (map[int(cx) + int(cy) * map_w] != ' ')
+					{
+						size_t column_height = min(2048, (surface.height / t / cos(angle - player_a)));
+						int texid = (int)map[int(cx) + int(cy) * map_w] - 48;
+
+						float hitx = cx - floor(cx + 0.5f);
+						float hity = cy - floor(cy + 0.5f);
+						int x_texcoord = hitx * walltext.width;
+						if (std::abs(hity) > std::abs(hitx))
+						{
+							x_texcoord = hity * walltext.width;
+						}
+						if (x_texcoord < 0) x_texcoord += walltext.width;
+						assert(x_texcoord >= 0 && x_texcoord < (int)walltext.width);
+
+
+						texture_column(column4, walltext, texid, x_texcoord, column_height);
+						pix_x = i;
+						for (size_t j = 0; j < column_height; j++) {
+							pix_y = j + surface.height / 2 - column_height / 2;
+							if (pix_y < 0 || pix_y >= surface.height) continue;
+							surface.memory[pix_x + pix_y * surface.width] = column4[j];
+							// depth_buffer
+							depth_buffer[pix_x] = t;
+						}
+						break;
+					}
+				}
+			}
+		});
+
+		wall1.get();
+		wall2.get();
+		wall3.get();
+		wall4.get();
+
+		// not the best solution but i'm too lazzy
+		// 2x times faster then single thread
 
 		// draw map
 		for (int i = 0; i < map_h; i++)
@@ -530,58 +677,36 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				int y = i * map_cell_h;
 
 				if (map[i * map_w + j] != ' ')
-					draw_rectangle(&surface, y, x, map_cell_w, map_cell_h, colors[map[i * map_w + j] - 48]); // -48 get id from char
+					draw_rectangle(y, x, map_cell_w, map_cell_h, map_colors[map[i * map_w + j] - 48]); // -48 get id from char
 			}
 		}
 
 		// draw player on map
-		draw_rectangle(&surface, player_y * map_cell_w - 2, player_x * map_cell_h - 2, 5, 5, pack_color(60, 60, 60));
+		draw_rectangle(player_y * map_cell_w - 2, player_x * map_cell_h - 2, 5, 5, Color(60, 60, 60));
 
 
-		// enemies
-		for (int n = 0; n < enemies.size(); n++)
+		// enemies --------------------------------------------------------------------------------------------
+		for (int n = 0; n < enemies.actives; n++)
 		{
 			int text_id = 0;
-			enemies[n]->visible = false;
+			enemies[n].visible = false;
 
 			// absolute direction from the player to the sprite (in radians)
-			float sprite_dir = atan2(enemies[n]->m_pos_y - player_y, enemies[n]->m_pos_x - player_x);
+			float sprite_dir = atan2(enemies[n].pos_y - player_y, enemies[n].pos_x - player_x);
 
-			// calculate the side of enemy
-			float dif = sprite_dir - enemies[n]->m_agle;
-			int side = 0;
-
-			//if ((dif <= PI / 2 && dif > PI / 4))
-			//	side = 2;
-			//else if (dif  < PI / 8 && dif > -PI / 8)
-			//	side = 4;
-			//else if (dif < 2 * PI / 8 && dif > PI / 8)
-			//	side = 3;
-			//else if (dif < 0 && dif > -PI / 4)
-			//	side = 7;
-			//else if (dif < -PI / 4 && dif >(-2)* PI / 4)
-			//	side = 6;
-			//else if (dif < (-2) * PI / 4 && dif >(-3)* PI / 4)
-			//	side = 5;
-			//else if (dif < (-3) * PI / 4 && dif >(-5)* PI / 4)
-			//	side = 0;
-			////else if (dif < (-5) * PI / 4 && dif > (-6)* PI / 4);
-			//	//text_id += 1;
-
-			text_id += side;
 
 			// death sprite animation
-			if (enemies[n]->hit && enemies[n]->m_hp > 0)
+			if (enemies[n].hit && enemies[n].hp > 0)
 			{
-				if (enemies[n]->hit_animation.cycles)
-					text_id = enemies[n]->hit_animation.sprite(timer.elapsed);
+				if (enemies[n].hit_animation.cycles)
+					text_id = enemies[n].hit_animation.sprite(timer.elapsed);
 				else
-					enemies[n]->hit = false;
+					enemies[n].hit = false;
 			}
-			else if (enemies[n]->m_hp <= 0)
+			else if (enemies[n].hp <= 0)
 			{
-				int frame = enemies[n]->death_animation.sprite(timer.elapsed);
-				frame = frame || enemies[n]->death_animation.cycles != 0 ? frame + 8 : frame + 12;
+				int frame = enemies[n].death_animation.sprite(timer.elapsed);
+				frame = frame || enemies[n].death_animation.cycles != 0 ? frame + 8 : frame + 12;
 				text_id = frame;
 			}
 
@@ -590,58 +715,56 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			while (sprite_dir - player_a < -PI) sprite_dir += 2 * PI;
 
 			// distance from the player to the sprite
-			enemies[n]->m_distance = sqrt(pow(player_x - enemies[n]->m_pos_x, 2) + pow(player_y - enemies[n]->m_pos_y, 2));
-			size_t sprite_screen_size = min(2000, static_cast<int>(win_h / enemies[n]->m_distance));
+			enemies[n].distance = sqrt(pow(player_x - enemies[n].pos_x, 2) + pow(player_y - enemies[n].pos_y, 2));
+			size_t sprite_screen_size = min(2000, static_cast<int>(surface.height / enemies[n].distance));
 
-			int h_offset = (sprite_dir - player_a) * (win_w) / (fov) + (win_w) / 2 - sprite_screen_size / 2;
-			int v_offset = win_h / 2 - sprite_screen_size / 2;
+			int h_offset = (sprite_dir - player_a) * (surface.width) / (fov) + (surface.width) / 2 - sprite_screen_size / 2;
+			int v_offset = surface.height / 2 - sprite_screen_size / 2;
 
 			// enemy on map
-			if (fabs(sprite_dir - player_a) < fov / 2 && enemies[n]->m_distance < 20 && depth_buffer[h_offset] > enemies[n]->m_distance && enemies[n]->m_hp > 0)
-				draw_rectangle(&surface, enemies[n]->m_pos_y * map_cell_w - 2, enemies[n]->m_pos_x * map_cell_h - 2, 3, 3, pack_color(240, 10, 10));
+			if (fabs(sprite_dir - player_a) < fov / 2 && enemies[n].distance < 20 && depth_buffer[h_offset] > enemies[n].distance && enemies[n].hp > 0)
+				draw_rectangle(enemies[n].pos_y * map_cell_w - 2, enemies[n].pos_x * map_cell_h - 2, 3, 3, Color(240, 10, 10));
 
 			for (size_t i = 0; i < sprite_screen_size; i++)
 			{
-				if (h_offset + int(i) < 0 || h_offset + i >= win_w) continue;
+				if (h_offset + int(i) < 0 || h_offset + i >= surface.width) continue;
 				
-				if (depth_buffer[h_offset + int(i)] > enemies[n]->m_distance)
+				if (depth_buffer[h_offset + int(i)] > enemies[n].distance)
 				{
-					if (enemies[n]->m_hp > 0)
-						depth_buffer[h_offset + int(i)] = enemies[n]->m_distance;
+					if (enemies[n].hp > 0)
+						depth_buffer[h_offset + int(i)] = enemies[n].distance;
 				}
 				else continue;
 
 				for (size_t j = 1; j < sprite_screen_size; j++)
 				{
-					if (v_offset + int(j) < 0 || v_offset + j >= win_h) continue;
+					if (v_offset + int(j) < 0 || v_offset + j >= surface.height) continue;
 					
-					enemies[n]->visible = true;
-					uint32_t color;
-					if (enemies[n]->m_hp > 0 && !enemies[n]->hit)
-						color = Imp::sprites[(int)(i * (float)imp_size / sprite_screen_size) +  (int)((sprite_screen_size - j) * (float)imp_size / sprite_screen_size) * imp_cnt * imp_size + imp_size * text_id];
-					else
-						color = Imp::death[(int)(i * (float)impd_size / sprite_screen_size) + (int)((sprite_screen_size - j) * (float)impd_size / sprite_screen_size) * impd_cnt * impd_size + impd_size * text_id];
+					enemies[n].visible = true;
+
+					bool sprite_type = !(enemies[n].hp > 0 && !enemies[n].hit);
+					int w = enemy_sprites[ENEMY_IMP][sprite_type].width;
+					int count = enemy_sprites[ENEMY_IMP][sprite_type].count;
+					Color color = enemy_sprites[ENEMY_IMP][sprite_type].data[(int)(i * (float)w / sprite_screen_size) + (int)((sprite_screen_size - j) * (float)w / sprite_screen_size) * count * w + w * text_id];
 
 
 					// filter the background
-					uint8_t a, r, g, b;
-					unpack_color(color, r, g, b, a);
-					if (r < 140 && b > 60 && g > 55) continue;
-					surface.memory[h_offset + i + (v_offset + j) * win_w] = color;
+					if (color.r < 140 && color.b > 60 && color.g > 55) continue;
+					surface.memory[h_offset + i + (v_offset + j) * surface.width] = color;
 				}
 			}
 
 			// behavior
-			if (enemies[n]->m_hp > 0)
-				enemies[n]->behavior(enemies[n], player_x, player_y, timer.elapsed, bullets);
+			if (enemies[n].hp > 0)
+				enemies[n].behavior(enemies[n], player_x, player_y, timer.elapsed, bullets);
 		}
 
 		// sort enemies
-		std::sort(enemies.begin(), enemies.end(), [](Enemy* a, Enemy* b) { return a->m_distance > b->m_distance; });
+		std::sort(enemies.begin(), enemies.end(), [](Enemy& a, Enemy& b) { return a.distance > b.distance; });
 
 
 
-		// gun  animation
+		// gun  animation -----------------------------------------------------------------------------------------
 		if (shot)
 			pistol_anime.add_cycle(1);
 		
@@ -657,75 +780,73 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			gun_shift += gun_shift_dir * timer.elapsed * 30;
 		}
 
-		int gun_h = int(win_h / 2.3f);
-		int gun_w = win_w / 3;
+		int gun_h = int(surface.height / 2.3f);
+		int gun_w = surface.width / 3;
 
 		for (int i = 0; i < gun_h; i++)
 		{
 			for (int j = 0; j < gun_w; j++)
 			{
-				uint32_t color = pistol[(int)((gun_h - i) * ((float)pistol_size / gun_h)) * pistol_size * pistol_cnt + (int)(j * ((float)pistol_size / gun_w)) + pistol_size * gun_texture_id];
+				Color color = gun.data[(int)((gun_h - i) * ((float)gun.width / gun_h)) * gun.width * gun.count + (int)(j * ((float)gun.width / gun_w)) + gun.width * gun_texture_id];
 
 				// filter the image background
-				uint8_t a, r, g, b;
-				unpack_color(color, r, g, b, a);
-				if (r < 80 && b > 90 && g > 85) continue;
+				if (color.r < 80 && color.b > 90 && color.g > 85) continue;
 
-				if ((i + (int)gun_shift - 20) * win_w + j + (int)(win_w / 2.9f) < 0) continue;
+				if ((i + (int)gun_shift - 20) * surface.width + j + (int)(surface.width / 2.9f) < 0) continue;
 
-				surface.memory[(i + (int)gun_shift - 20) * win_w + j + (int)(win_w / 2.9f)] = color;
+				surface.memory[(i + (int)gun_shift - 20) * surface.width + j + (int)(surface.width / 2.9f)] = color;
 			}
 		}
 
 		// shot handler
 		if (shot)
 		{
-			for (int i = 0; i < enemies.size(); i++)
+			for (int i = 0; i < enemies.actives; i++)
 			{
 				// absolute direction from the player to the sprite (in radians)
-				float sprite_dir = atan2(enemies[i]->m_pos_y - player_y, enemies[i]->m_pos_x - player_x);
+				float sprite_dir = atan2(enemies[i].pos_y - player_y, enemies[i].pos_x - player_x);
 
 				// remove unnecessary periods from the relative direction
 				while (sprite_dir - player_a > PI) sprite_dir -= 2 * PI;
 				while (sprite_dir - player_a < -PI) sprite_dir += 2 * PI;
 
-				if (fabs(fabs(player_a) - fabs(sprite_dir - 0.07f)) < 0.07f && enemies[i]->visible)
+				if (fabs(fabs(player_a) - fabs(sprite_dir - 0.07f)) < 0.07f && enemies[i].visible)
 				{
-					enemies[i]->m_hp -= 50;
-					enemies[i]->hit = true;
-					enemies[i]->hit_animation.add_cycle(1);
+					enemies[i].hp -= 50;
+					enemies[i].hit = true;
+					enemies[i].hit_animation.add_cycle(1);
 				}
 			}
 		}
 
 		// sort enemyes bullets by distance
-		if (bullets.size() > 1)
-			std::sort(bullets.begin(), bullets.end(), [](Bullet* a, Bullet* b) { return a->distance > b->distance; });
+		if (bullets.actives > 1)
+			std::sort(bullets.begin(), bullets.end(), [](Bullet& a, Bullet& b) { return a.distance > b.distance; });
 
 
-		// draw enemy bullets
-		for (int n = 0; n < bullets.size(); n++)
+		// bullets ---------------------------------------------------------------------------------------------------
+		for (int n = 0; n < bullets.actives; n++)
 		{
 			// BULLET HANDLER-------------------
 
 			// bullet movment
-			bullets[n]->pos_x += timer.elapsed * cosf(bullets[n]->angle) * bullets[n]->speed;
-			bullets[n]->pos_y += timer.elapsed * sinf(bullets[n]->angle) * bullets[n]->speed;
+			bullets[n].pos_x += timer.elapsed * cosf(bullets[n].angle) * bullets[n].speed;
+			bullets[n].pos_y += timer.elapsed * sinf(bullets[n].angle) * bullets[n].speed;
 
 			// if in wall
-			if (map[int(bullets[n]->pos_y) * map_w + int(bullets[n]->pos_x)] != ' ')
+			if (map[int(bullets[n].pos_y) * map_w + int(bullets[n].pos_x)] != ' ')
 			{
-				bullets.erase(bullets.begin() + n--);
+				bullets.remove(n--);
 				continue;
 			}
 
 			// if player
-			if (fabs(bullets[n]->pos_y - player_y) < 0.2f && fabs(bullets[n]->pos_x - player_x) < 0.2f)
+			if (fabs(bullets[n].pos_y - player_y) < 0.2f && fabs(bullets[n].pos_x - player_x) < 0.2f)
 			{
 				player_hp -= 20;
 				get_damage = true;
 				damageAnime.add_cycle(1);
-				bullets.erase(bullets.begin() + n--);
+				bullets.remove(n--);
 				continue;
 			}
 
@@ -734,44 +855,46 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			// DRAW BULLET
 
 			// angle of bullet
-			float sprite_dir = atan2(bullets[n]->pos_y - player_y, bullets[n]->pos_x - player_x);
+			float sprite_dir = atan2(bullets[n].pos_y - player_y, bullets[n].pos_x - player_x);
 
 			while (sprite_dir - player_a > PI) sprite_dir -= 2 * PI;
 			while (sprite_dir - player_a < -PI) sprite_dir += 2 * PI;
 
 			// distance from the player to the bullet
-			bullets[n]->distance = sqrt(pow(player_x - bullets[n]->pos_x, 2) + pow(player_y - bullets[n]->pos_y, 2));
-			size_t sprite_screen_size = min(2000, static_cast<int>(win_h / bullets[n]->distance));
+			bullets[n].distance = sqrt(pow(player_x - bullets[n].pos_x, 2) + pow(player_y - bullets[n].pos_y, 2));
+			size_t sprite_screen_size = min(2000, static_cast<int>(surface.height / bullets[n].distance));
 
-			int h_offset = (sprite_dir - player_a) * (win_w) / (fov)+(win_w) / 2 - sprite_screen_size / 2;
-			int v_offset = win_h / 2 - sprite_screen_size / 2;
+			int h_offset = (sprite_dir - player_a) * (surface.width) / (fov)+(surface.width) / 2 - sprite_screen_size / 2;
+			int v_offset = surface.height / 2 - sprite_screen_size / 2;
 
 			// bullet on map
-			if (fabs(sprite_dir - player_a) < fov / 2 && bullets[n]->distance < 20 && depth_buffer[h_offset] > bullets[n]->distance)
-				draw_rectangle(&surface, bullets[n]->pos_y * map_cell_w - 2, bullets[n]->pos_x * map_cell_h - 2, 2, 2, pack_color(240, 10, 10));
+			if (fabs(sprite_dir - player_a) < fov / 2 && bullets[n].distance < 20 && depth_buffer[h_offset] > bullets[n].distance)
+				draw_rectangle(bullets[n].pos_y * map_cell_w - 2, bullets[n].pos_x * map_cell_h - 2, 2, 2, Color(240, 10, 10));
+
+			int bw = bullet_spites[IMP_BULLET].width;
+			int bcount = bullet_spites[IMP_BULLET].count;
+
 
 			for (size_t i = 0; i < sprite_screen_size; i++)
 			{
-				if (h_offset + int(i) < 0 || h_offset + i >= win_w) continue;
+				if (h_offset + int(i) < 0 || h_offset + i >= surface.width) continue;
 
-				if (depth_buffer[h_offset + int(i)] > bullets[n]->distance)
+				if (depth_buffer[h_offset + int(i)] > bullets[n].distance)
 				{
-					depth_buffer[h_offset + int(i)] = bullets[n]->distance;
+					depth_buffer[h_offset + int(i)] = bullets[n].distance;
 				}
 				else continue;
 
 				for (size_t j = 1; j < sprite_screen_size; j++)
 				{
-					if (v_offset + int(j) < 0 || v_offset + j >= win_h) continue;
+					if (v_offset + int(j) < 0 || v_offset + j >= surface.height) continue;
 
 					// take a pixel of texture (relative by screen size)
-					uint32_t color = Imp_bullet::sprite[(int)(i * (float)impb_size / sprite_screen_size) + (int)((sprite_screen_size - j) * (float)impb_size / sprite_screen_size) * impb_cnt * impb_size];
+					Color color = bullet_spites[IMP_BULLET].data[(int)(i * (float)bw / sprite_screen_size) + (int)((sprite_screen_size - j) * (float)bw / sprite_screen_size) * bcount * bw];
 
 					// filter the background
-					uint8_t a, r, g, b;
-					unpack_color(color, r, g, b, a);
-					if (r == 255 && b == 0 && g == 110) continue;
-					surface.memory[h_offset + i + (v_offset + j) * win_w] = color;
+					if (color.r == 255 && color.b == 0 && color.g == 110) continue;
+					surface.memory[h_offset + i + (v_offset + j) * surface.width] = color;
 				}
 			}
 		}
@@ -781,8 +904,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		{
 			damageAnime.sprite(timer.elapsed);
 
-			for (int i = 0; i < win_w * win_h; i++)
-				surface.memory[i] |= 80 << 16; // red screen
+			for (int i = 0; i < surface.width * surface.height; i++)
+				surface.memory[i].r = 255; // red screen
 		}
 
 		// death animation
@@ -793,8 +916,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			if (deathAnime.cycles == 0)
 				return 0;
 
-			for (int i = 0; i < win_w * win_h; i++)
-				surface.memory[i] = 255 << 16; // red screen
+			for (int i = 0; i < surface.width * surface.height; i++)
+				surface.memory[i] = Color(255, 0, 0); // red screen
 		}
 
 		// Render
@@ -812,6 +935,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		
 	//dump_log();
 	delete[] depth_buffer;
-	delete[] column;
+	delete[] column1;
+	delete[] column2;
+	delete[] column3;
+
 	return 0;
 }
