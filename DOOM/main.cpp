@@ -164,6 +164,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	const size_t map_cell_w = surface.width / map_w / 5;
 	const size_t map_cell_h = surface.height / map_h / 4;
 
+	const size_t map_screen_w = surface.width / map_w / 5 * map_w;
+	const size_t map_screen_h = surface.height / map_h / 4 * map_h;
+
+
 	// walls colors on map
 	Color* map_colors = new Color[10];
 	for (size_t i = 0; i < 10; i++)
@@ -501,6 +505,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 						for (size_t j = 0; j < column_height; j++) {
 							pix_y = j + surface.height / 2 - column_height / 2;
 							if (pix_y < 0 || pix_y >= surface.height) continue;
+							if (pix_x < map_screen_w && pix_y < map_screen_h) continue;
 							surface.memory[pix_x + pix_y * surface.width] = column1[j];
 							// depth_buffer
 							depth_buffer[pix_x] = t;
