@@ -89,11 +89,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	HDC hdc = GetDC(window);
 
 	// GAME VARS------------------------------
-	Color* column1 = new Color[2048];
-	Color* column2 = new Color[2048];
-	Color* column3 = new Color[2048];
-	Color* column4 = new Color[2048]; // for each thread
-
+	Color* column[8];
+	for (int i = 0; i < 8; i++)
+		column[i] = new Color[2048]; // for each thread
 
 	float* depth_buffer = new float[1980];
 
@@ -218,7 +216,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 	Bullet_buffer<MAX_BULLETS> bullets;
 	
 	// thread pool
-	thread_pool workers(4);
+	thread_pool workers(8);
+	std::future<void> res[8];
 
 	// input
 	Input input;
@@ -442,237 +441,97 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 		// draw the background
 		// floor
-		auto _floor = workers.add_task([]() {
-			draw_rectangle(0, 0, surface.width, surface.height / 2, Color(130, 130, 130));
-		});
+		int threads = workers.size;
+		for (int i = 0; i < threads; i++)
+		{
+			res[i] = workers.add_task([i, threads](void) {
+				draw_rectangle(i * surface.width / threads, 0, surface.width / threads, surface.height / 2, Color(130, 130, 130));
+			});
+		}
+		for (int i = 0; i < workers.size; i++)
+			res[i].get();
+
 		// sky
-		auto _skys = workers.add_task([&sky]() {
-			for (int y = surface.height / 2; y < surface.height; y++)
-			{
-				for (int x = 0; x < surface.width; x++)
+		for (int i = 0; i < threads; i++)
+		{
+			res[i] = workers.add_task([&sky, i, threads]() {
+				for (int y = surface.height / 2; y < surface.height; y++)
 				{
-					Color color = sky.data[(int)(y * ((float)sky.width / surface.height / 2)) * sky.width + (int)(x * ((float)sky.width / surface.width))];
-					surface.memory[y * surface.width + x] = color;
+					for (int x = i * surface.width / threads; x < (i + 1) * surface.width / threads; x++)
+					{
+						Color color = sky.data[(int)(y * ((float)sky.width / surface.height / 2)) * sky.width + (int)(x * ((float)sky.width / surface.width))];
+						surface.memory[y * surface.width + x] = color;
+					}
 				}
-			}
-		});
+			});
+		}
 		
 		// wait 
-		_floor.get();
-		_skys.get();
-
+		for (int i = 0; i < threads; i++)
+			res[i].get();
 
 		// Walls ---------------------------------------------------------------------------------
 		const float fov = PI / 3.0f; // field of view
 
 		// ray caster
-		auto wall1 = workers.add_task([&]() {
-			for (int i = 0; i < surface.width / 4; i++)
-			{
-				float angle = player_a - fov / 2 + fov * i / float(surface.width);
-
-
-				// ray casting
-				for (float t = 0.0f; t < 20; t += 0.025f)
+		for (int i = 0; i < threads; i++)
+		{
+			res[i] = workers.add_task([=]() {
+				int cut = i;
+				for (int i = cut * surface.width / threads; i < (cut + 1) * surface.width / threads; i++)
 				{
-					float cx = player_x + t * cos(angle);
-					float cy = player_y + t * sin(angle);
+					float angle = player_a - fov / 2 + fov * i / float(surface.width);
 
-					// ray on map
-					size_t pix_x = cy * map_cell_w;
-					size_t pix_y = cx * map_cell_h;
-					surface.memory[pix_x + pix_y * surface.width] = Color(240, 240, 240);
-
-					// walls
-					if (map[int(cx) + int(cy) * map_w] != ' ')
+					// ray casting
+					for (float t = 0.0f; t < 20; t += 0.025f)
 					{
-						size_t column_height = min(2048, (surface.height / t / cos(angle - player_a)));
-						int texid = (int)map[int(cx) + int(cy) * map_w] - 48;
+						float cx = player_x + t * cos(angle);
+						float cy = player_y + t * sin(angle);
 
-						float hitx = cx - floor(cx + 0.5f);
-						float hity = cy - floor(cy + 0.5f);
-						int x_texcoord = hitx * walltext.width;
-						if (std::abs(hity) > std::abs(hitx))
+						// ray on map
+						size_t pix_x = cy * map_cell_w;
+						size_t pix_y = cx * map_cell_h;
+						surface.memory[pix_x + pix_y * surface.width] = Color(240, 240, 240);
+
+						// walls
+						if (map[int(cx) + int(cy) * map_w] != ' ')
 						{
-							x_texcoord = hity * walltext.width;
-						}
-						if (x_texcoord < 0) x_texcoord += walltext.width;
-						assert(x_texcoord >= 0 && x_texcoord < (int)walltext.width);
+							size_t column_height = min(2048, (surface.height / t / cos(angle - player_a)));
+							int texid = (int)map[int(cx) + int(cy) * map_w] - 48;
+
+							float hitx = cx - floor(cx + 0.5f);
+							float hity = cy - floor(cy + 0.5f);
+							int x_texcoord = hitx * walltext.width;
+							if (std::abs(hity) > std::abs(hitx))
+							{
+								x_texcoord = hity * walltext.width;
+							}
+							if (x_texcoord < 0) x_texcoord += walltext.width;
+							assert(x_texcoord >= 0 && x_texcoord < (int)walltext.width);
 
 
-						texture_column(column1, walltext, texid, x_texcoord, column_height);
-						pix_x = i;
-						for (size_t j = 0; j < column_height; j++) {
-							pix_y = j + surface.height / 2 - column_height / 2;
-							if (pix_y < 0 || pix_y >= surface.height) continue;
-							if (pix_x < map_screen_w && pix_y < map_screen_h) continue;
-							surface.memory[pix_x + pix_y * surface.width] = column1[j];
-							// depth_buffer
-							depth_buffer[pix_x] = t;
+							texture_column(column[cut], walltext, texid, x_texcoord, column_height);
+							pix_x = i;
+							for (size_t j = 0; j < column_height; j++)
+							{
+								pix_y = j + surface.height / 2 - column_height / 2;
+								if (pix_y < 0 || pix_y >= surface.height) continue;
+								if (pix_x < map_screen_w && pix_y < map_screen_h) continue;
+								surface.memory[pix_x + pix_y * surface.width] = column[cut][j];
+								// depth_buffer
+								depth_buffer[pix_x] = t;
+							}
+							break;
 						}
-						break;
 					}
 				}
-			}
-		});
+			});
+		}
 
-		// ray caster
-		auto wall2 = workers.add_task([&]() {
-			for (int i = surface.width / 4; i < surface.width / 2; i++)
-			{
-				float angle = player_a - fov / 2 + fov * i / float(surface.width);
+		for (int i = 0; i < threads; i++)
+			res[i].get();
 
-
-				// ray casting
-				for (float t = 0.0f; t < 20; t += 0.025f)
-				{
-					float cx = player_x + t * cos(angle);
-					float cy = player_y + t * sin(angle);
-
-					// ray on map
-					size_t pix_x = cy * map_cell_w;
-					size_t pix_y = cx * map_cell_h;
-					surface.memory[pix_x + pix_y * surface.width] = Color(240, 240, 240);
-
-					// walls
-					if (map[int(cx) + int(cy) * map_w] != ' ')
-					{
-						size_t column_height = min(2048, (surface.height / t / cos(angle - player_a)));
-						int texid = (int)map[int(cx) + int(cy) * map_w] - 48;
-
-						float hitx = cx - floor(cx + 0.5f);
-						float hity = cy - floor(cy + 0.5f);
-						int x_texcoord = hitx * walltext.width;
-						if (std::abs(hity) > std::abs(hitx))
-						{
-							x_texcoord = hity * walltext.width;
-						}
-						if (x_texcoord < 0) x_texcoord += walltext.width;
-						assert(x_texcoord >= 0 && x_texcoord < (int)walltext.width);
-
-
-						texture_column(column2, walltext, texid, x_texcoord, column_height);
-						pix_x = i;
-						for (size_t j = 0; j < column_height; j++) {
-							pix_y = j + surface.height / 2 - column_height / 2;
-							if (pix_y < 0 || pix_y >= surface.height) continue;
-							surface.memory[pix_x + pix_y * surface.width] = column2[j];
-							// depth_buffer
-							depth_buffer[pix_x] = t;
-						}
-						break;
-					}
-				}
-			}
-		});
-
-		auto wall3 = workers.add_task([&]() {
-			for (int i = surface.width / 2; i < 3 * surface.width / 4; i++)
-			{
-				float angle = player_a - fov / 2 + fov * i / float(surface.width);
-
-
-				// ray casting
-				for (float t = 0.0f; t < 20; t += 0.025f)
-				{
-					float cx = player_x + t * cos(angle);
-					float cy = player_y + t * sin(angle);
-
-					// ray on map
-					size_t pix_x = cy * map_cell_w;
-					size_t pix_y = cx * map_cell_h;
-					surface.memory[pix_x + pix_y * surface.width] = Color(240, 240, 240);
-
-					// walls
-					if (map[int(cx) + int(cy) * map_w] != ' ')
-					{
-						size_t column_height = min(2048, (surface.height / t / cos(angle - player_a)));
-						int texid = (int)map[int(cx) + int(cy) * map_w] - 48;
-
-						float hitx = cx - floor(cx + 0.5f);
-						float hity = cy - floor(cy + 0.5f);
-						int x_texcoord = hitx * walltext.width;
-						if (std::abs(hity) > std::abs(hitx))
-						{
-							x_texcoord = hity * walltext.width;
-						}
-						if (x_texcoord < 0) x_texcoord += walltext.width;
-						assert(x_texcoord >= 0 && x_texcoord < (int)walltext.width);
-
-
-						texture_column(column3, walltext, texid, x_texcoord, column_height);
-						pix_x = i;
-						for (size_t j = 0; j < column_height; j++) {
-							pix_y = j + surface.height / 2 - column_height / 2;
-							if (pix_y < 0 || pix_y >= surface.height) continue;
-							surface.memory[pix_x + pix_y * surface.width] = column3[j];
-							// depth_buffer
-							depth_buffer[pix_x] = t;
-						}
-						break;
-					}
-				}
-			}
-		});
-
-		// ray caster
-		auto wall4 = workers.add_task([&]() {
-			for (int i = 3 * surface.width / 4; i < surface.width; i++)
-			{
-				float angle = player_a - fov / 2 + fov * i / float(surface.width);
-
-
-				// ray casting
-				for (float t = 0.0f; t < 20; t += 0.025f)
-				{
-					float cx = player_x + t * cos(angle);
-					float cy = player_y + t * sin(angle);
-
-					// ray on map
-					size_t pix_x = cy * map_cell_w;
-					size_t pix_y = cx * map_cell_h;
-					surface.memory[pix_x + pix_y * surface.width] = Color(240, 240, 240);
-
-					// walls
-					if (map[int(cx) + int(cy) * map_w] != ' ')
-					{
-						size_t column_height = min(2048, (surface.height / t / cos(angle - player_a)));
-						int texid = (int)map[int(cx) + int(cy) * map_w] - 48;
-
-						float hitx = cx - floor(cx + 0.5f);
-						float hity = cy - floor(cy + 0.5f);
-						int x_texcoord = hitx * walltext.width;
-						if (std::abs(hity) > std::abs(hitx))
-						{
-							x_texcoord = hity * walltext.width;
-						}
-						if (x_texcoord < 0) x_texcoord += walltext.width;
-						assert(x_texcoord >= 0 && x_texcoord < (int)walltext.width);
-
-
-						texture_column(column4, walltext, texid, x_texcoord, column_height);
-						pix_x = i;
-						for (size_t j = 0; j < column_height; j++) {
-							pix_y = j + surface.height / 2 - column_height / 2;
-							if (pix_y < 0 || pix_y >= surface.height) continue;
-							surface.memory[pix_x + pix_y * surface.width] = column4[j];
-							// depth_buffer
-							depth_buffer[pix_x] = t;
-						}
-						break;
-					}
-				}
-			}
-		});
-
-		wall1.get();
-		wall2.get();
-		wall3.get();
-		wall4.get();
-
-		// not the best solution but i'm too lazzy
-		// 2x times faster then single thread
-
+		
 		// draw map
 		for (int i = 0; i < map_h; i++)
 		{
@@ -730,10 +589,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 			if (fabs(sprite_dir - player_a) < fov / 2 && enemies[n].distance < 20 && depth_buffer[h_offset] > enemies[n].distance && enemies[n].hp > 0)
 				draw_rectangle(enemies[n].pos_y * map_cell_w - 2, enemies[n].pos_x * map_cell_h - 2, 3, 3, Color(240, 10, 10));
 
-			for (size_t i = 0; i < sprite_screen_size; i++)
+			for (size_t i = 0; i < sprite_screen_size ; i++)
 			{
 				if (h_offset + int(i) < 0 || h_offset + i >= surface.width) continue;
-				
+
 				if (depth_buffer[h_offset + int(i)] > enemies[n].distance)
 				{
 					if (enemies[n].hp > 0)
@@ -744,7 +603,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 				for (size_t j = 1; j < sprite_screen_size; j++)
 				{
 					if (v_offset + int(j) < 0 || v_offset + j >= surface.height) continue;
-					
+
 					enemies[n].visible = true;
 
 					bool sprite_type = !(enemies[n].hp > 0 && !enemies[n].hit);
@@ -940,9 +799,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		
 	//dump_log();
 	delete[] depth_buffer;
-	delete[] column1;
-	delete[] column2;
-	delete[] column3;
+	for (int i = 0; i < 8; i++)
+		delete[] column[i];
 
 	return 0;
 }

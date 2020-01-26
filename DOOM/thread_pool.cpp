@@ -12,7 +12,7 @@
 
 struct thread_pool
 {
-	size_t num_threads;
+	size_t size;
 	std::vector<std::thread> pool;
 	std::queue<std::function<void()>> tasks;
 	std::condition_variable event;
@@ -23,7 +23,7 @@ struct thread_pool
 
 	thread_pool(size_t threads = 8)
 	{
-		num_threads = MIN(std::thread::hardware_concurrency(), threads);
+		size = MIN(std::thread::hardware_concurrency(), threads);
 		stopping = false;
 		start();
 	}
@@ -46,7 +46,7 @@ private:
 
 	void start()
 	{
-		for (int i = 0; i < num_threads; i++)
+		for (int i = 0; i < size; i++)
 		{
 			pool.push_back(std::thread([&]() {
 				while (true)

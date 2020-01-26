@@ -11,6 +11,15 @@ struct Sprites
 
 	Sprites() : invalid(true), data(nullptr), height(0), width(0), count(0), whole_width(0) {}
 	Sprites(const char* filename) { load(filename); }
+	Sprites(const Sprites& other)
+	{
+		height = other.height;
+		width = other.width;
+		whole_width = other.whole_width;
+		count = other.count;
+		data = new Color[whole_width * height];
+		memmove(data, other.data, sizeof(Color) * whole_width * height);
+	}
 
 	void load(const char*filename)
 	{
@@ -83,7 +92,7 @@ struct Sprites
 };
 
 
-inline void texture_column(Color* out_colum, Sprites& wall_textures, const size_t& texid, const size_t& texcoord, const size_t& column_height)
+inline void texture_column(Color* out_colum, const Sprites& wall_textures, const size_t& texid, const size_t& texcoord, const size_t& column_height)
 {
 	const size_t img_w = wall_textures.whole_width;
 
