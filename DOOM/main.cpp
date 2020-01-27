@@ -788,9 +788,16 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		StretchDIBits(hdc, 0, 0, surface.width, surface.height, 0, 0, surface.width, surface.height, surface.memory, &surface.bitmap_info, DIB_RGB_COLORS, SRCCOPY);
 
 		// Log
-		char info[32];
-		sprintf_s(info, "fps_%d  frame time_%.4f sec\n", timer.FPS, timer.elapsed);
-		OutputDebugString(info);
+		static float output_del = 0.0f;
+		if (output_del < 0)
+		{
+			output_del = 1.0f;
+			char info[64];
+			sprintf_s(info, "DOOM fps: %d  frame time: %.3f sec\n", timer.FPS, timer.elapsed);
+			//OutputDebugString(info);
+			SetWindowTextA(window, info);
+		}
+		output_del -= timer.elapsed;
 
 		// Timer
 		timer.update();
