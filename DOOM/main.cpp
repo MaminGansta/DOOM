@@ -476,7 +476,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 		// ray caster
 		for (int i = 0; i < threads; i++)
 		{
-			res[i] = workers.add_task([=]() {
+			res[i] = workers.add_task([=, &walltext]() {
 				int cut = i;
 				for (int i = cut * surface.width / threads; i < (cut + 1) * surface.width / threads; i++)
 				{
@@ -804,7 +804,6 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPiv, LPSTR args, int someshit)
 
 	}
 		
-	//dump_log();
 	delete[] depth_buffer;
 	for (int i = 0; i < 8; i++)
 		delete[] column[i];
